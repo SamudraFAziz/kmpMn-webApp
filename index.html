@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi KMP</title>
+    
+    <!-- External Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Link to your stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100 text-gray-800 flex">
+
+    <!-- Sidebar Navigation -->
+    <aside id="sidebar" class="bg-gray-800 text-white p-4 flex flex-col fixed h-full">
+        <div class="flex items-center justify-center mb-10">
+             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mountain-snow"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/><path d="M4.14 15.08c2.62-1.57 5.24-1.43 7.86.42 2.74 1.94 5.49 2 8.23.19"/></svg>
+             <span class="sidebar-text ml-2 text-lg font-bold">KMP App</span>
+        </div>
+        <nav class="flex flex-col space-y-2">
+            <a href="#" class="sidebar-icon" data-page="dashboard" title="Dasbor">
+                <i data-lucide="layout-dashboard"></i>
+                <span class="sidebar-text">Dasbor</span>
+            </a>
+            <a href="#" class="sidebar-icon" data-page="data-entry" title="Input Data">
+                <i data-lucide="file-plus-2"></i>
+                <span class="sidebar-text">Input Data</span>
+            </a>
+            <a href="#" class="sidebar-icon" data-page="stock" title="Data & Stok Hewan">
+                <i data-lucide="archive"></i>
+                <span class="sidebar-text">Data & Stok Hewan</span>
+            </a>
+            <a href="#" class="sidebar-icon" data-page="allocation" title="Alokasi">
+                <i data-lucide="map-pin"></i>
+                <span class="sidebar-text">Alokasi</span>
+            </a>
+            <a href="#" class="sidebar-icon" data-page="rekap" title="Rekap">
+                <i data-lucide="bar-chart-3"></i>
+                <span class="sidebar-text">Rekap</span>
+            </a>
+        </nav>
+        <div class="mt-auto">
+             <div id="auth-container" class="sidebar-icon">
+                <button id="loginBtn" class="w-full flex items-center">
+                    <i data-lucide="log-in"></i>
+                    <span class="sidebar-text">Masuk</span>
+                </button>
+                <button id="logoutBtn" class="hidden w-full flex items-center">
+                    <i data-lucide="log-out"></i>
+                    <span class="sidebar-text">Keluar</span>
+                </button>
+            </div>
+            <button id="sidebar-toggle" class="p-3 mt-4 -mx-3 rounded-lg hover:bg-gray-700">
+                <i data-lucide="chevrons-right"></i>
+            </button>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main id="main-content" class="p-4 md:p-8 w-full">
+        <!-- Auth Info -->
+        <div class="flex justify-between items-center mb-6">
+            <h1 id="page-title" class="text-3xl font-bold text-gray-900">Dasbor</h1>
+             <div id="userInfo" class="text-sm text-gray-600 bg-white p-2 rounded-lg shadow-sm">
+                Belum masuk.
+            </div>
+        </div>
+
+        <!-- Page: Dashboard -->
+        <div id="dashboard" class="page">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-white p-6 rounded-xl shadow-md flex items-center space-x-4">
+                    <div class="bg-green-100 p-4 rounded-full"><i data-lucide="drumstick" class="text-green-600 h-8 w-8"></i></div>
+                    <div>
+                        <p class="text-gray-500">Total Nilai Kambing</p>
+                        <p id="total-goats-value" class="text-2xl font-bold">Rp 0</p>
+                        <p id="total-goats-qty" class="text-sm text-gray-500">0 ekor</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md flex items-center space-x-4">
+                    <div class="bg-indigo-100 p-4 rounded-full"><i data-lucide="ham" class="text-indigo-600 h-8 w-8"></i></div>
+                    <div>
+                        <p class="text-gray-500">Total Nilai Sapi Utuh</p>
+                        <p id="total-whole-cows-value" class="text-2xl font-bold">Rp 0</p>
+                        <p id="total-whole-cows-qty" class="text-sm text-gray-500">0 ekor</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md flex items-center space-x-4">
+                    <div class="bg-blue-100 p-4 rounded-full"><i data-lucide="beef" class="text-blue-600 h-8 w-8"></i></div>
+                    <div>
+                        <p class="text-gray-500">Total Nilai 1/7 Sapi</p>
+                        <p id="total-cows-value" class="text-2xl font-bold">Rp 0</p>
+                        <p id="total-cows-qty" class="text-sm text-gray-500">0 bagian</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md flex items-center space-x-4">
+                    <div class="bg-yellow-100 p-4 rounded-full"><i data-lucide="wallet" class="text-yellow-600 h-8 w-8"></i></div>
+                    <div>
+                        <p class="text-gray-500">Total Donasi Tunai</p>
+                        <p id="total-cash" class="text-3xl font-bold">Rp 0</p>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-8 bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-xl font-bold mb-4">Donasi Terbaru</h2>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left table-auto">
+                        <thead>
+                            <tr class="bg-gray-50 border-b">
+                                <th class="p-3 w-1/5">ID Donasi</th>
+                                <th class="p-3 w-1/5">Donatur</th>
+                                <th class="p-3 w-1/5">Jenis</th>
+                                <th class="p-3 w-1/12 text-center">Jumlah</th>
+                                <th class="p-3 w-1/4 text-right">Nilai (Rp)</th>
+                                <th class="p-3">Sumber</th>
+                                <th class="p-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-donations-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page: Data Entry -->
+        <div id="data-entry" class="page hidden">
+             <div class="max-w-xl mx-auto bg-white p-8 rounded-xl shadow-md">
+                <h2 class="text-2xl font-bold mb-6">Input Donasi Baru</h2>
+                <form id="donation-form" class="space-y-6">
+                    <div>
+                        <label for="donor-name" class="block text-sm font-medium text-gray-700">Nama Donatur</label>
+                        <input type="text" id="donor-name" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" required>
+                    </div>
+                    <div>
+                        <label for="donation-source" class="block text-sm font-medium text-gray-700">Sumber Donasi</label>
+                        <select id="donation-source" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" required>
+                            <option>Masjid Nusantara</option>
+                            <option>Kitabisa</option>
+                            <option>Amal Sholeh</option>
+                            <option>Sharing Happiness</option>
+                            <option>Launch Good</option>
+                            <option>Lainnya</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="donation-type" class="block text-sm font-medium text-gray-700">Jenis Donasi</label>
+                        <select id="donation-type" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" required>
+                            <option value="">-- Pilih Jenis --</option>
+                            <option value="goat">Kambing</option>
+                            <option value="cow_whole">Sapi Utuh</option>
+                            <option value="cow_share">1/7 Sapi</option>
+                            <option value="cash">Donasi Tunai</option>
+                        </select>
+                    </div>
+                    <div id="tier-field" class="hidden">
+                        <label for="donation-tier" class="block text-sm font-medium text-gray-700">Tipe</label>
+                        <select id="donation-tier" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm"></select>
+                    </div>
+                    <div id="quantity-field">
+                        <label for="quantity" class="block text-sm font-medium text-gray-700">Jumlah</label>
+                        <input type="number" id="quantity" value="1" min="1" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" required>
+                    </div>
+                    <div id="price-field">
+                        <label for="price" class="block text-sm font-medium text-gray-700">Harga (Rp)</label>
+                        <input type="number" id="price" placeholder="Harga akan terisi otomatis" class="mt-1 block w-full px-3 py-2 bg-gray-200" readonly>
+                    </div>
+                    <div>
+                        <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                            Kirim Donasi
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Page: Animal Stock -->
+        <div id="stock" class="page hidden">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Stok Hewan Belum Dialokasikan</h2>
+                    <div class="relative">
+                        <input type="text" id="stock-search-input" placeholder="Cari donasi..." class="pl-10 pr-4 py-2 border rounded-lg">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                </div>
+                 <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-50 border-b">
+                                <th class="p-3">ID Donasi</th>
+                                <th class="p-3">Donatur</th>
+                                <th class="p-3">Jenis</th>
+                                <th class="p-3">Tipe</th>
+                                <th class="p-3">Tanggal Masuk</th>
+                                <th class="p-3">Sumber</th>
+                                <th class="p-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stock-table"></tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <div class="bg-white p-6 rounded-xl shadow-md mt-8">
+                <h2 class="text-xl font-bold mb-4">Stok Hewan Sudah Dialokasikan</h2>
+                 <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-50 border-b">
+                                <th class="p-3">ID Donasi</th>
+                                <th class="p-3">Donatur</th>
+                                <th class="p-3">Jenis</th>
+                                <th class="p-3">Tipe</th>
+                                <th class="p-3">Lokasi</th>
+                                <th class="p-3">Sumber</th>
+                                <th class="p-3">Dialokasikan oleh</th>
+                                <th class="p-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="allocated-stock-table"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-md mt-8">
+                <h2 class="text-xl font-bold mb-4">Riwayat Donasi Tunai</h2>
+                 <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-50 border-b">
+                                <th class="p-3">ID Donasi</th>
+                                <th class="p-3">Donatur</th>
+                                <th class="p-3">Tanggal Masuk</th>
+                                <th class="p-3">Sumber</th>
+                                <th class="p-3 text-right">Nilai (Rp)</th>
+                                <th class="p-3 text-center">Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cash-donations-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page: Allocation (Admin Only) -->
+        <div id="allocation" class="page hidden">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <h2 class="text-xl font-bold mb-4">Alokasi Stok</h2>
+                <p id="admin-notice" class="text-red-600 mb-4">Anda harus menjadi Admin untuk mengakses fitur ini.</p>
+                <div id="admin-content" class="hidden">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div>
+                            <h3 class="font-semibold mb-2">Stok Belum Dialokasikan</h3>
+                            <div id="allocation-stock-list" class="h-96 overflow-y-auto border rounded-lg p-2 bg-gray-50"></div>
+                        </div>
+                        <div>
+                             <h3 class="font-semibold mb-2">Formulir Alokasi</h3>
+                             <form id="allocation-form" class="space-y-4">
+                                <div>
+                                    <label for="display-id-field" class="block text-sm font-medium text-gray-700">ID Stok</label>
+                                    <input type="text" id="display-id-field" placeholder="Pilih item dari daftar" class="mt-1 block w-full px-3 py-2 bg-gray-200" readonly>
+                                    <input type="hidden" id="real-doc-id">
+                                </div>
+                                <div>
+                                    <label for="location" class="block text-sm font-medium text-gray-700">Lokasi (Kabupaten/Kota)</label>
+                                    <input type="text" id="location" placeholder="cth. Bandung, Jawa Barat" class="mt-1 block w-full px-3 py-2 bg-white" required>
+                                </div>
+                                <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                                    Alokasikan
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                     <div class="mt-8">
+                        <h3 class="text-lg font-bold mb-4">Riwayat Alokasi Stok</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left">
+                                <thead>
+                                    <tr class="bg-gray-50 border-b">
+                                        <th class="p-3">ID Donasi</th>
+                                        <th class="p-3">Jenis</th>
+                                        <th class="p-3">Lokasi</th>
+                                        <th class="p-3">Dialokasikan oleh</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="allocation-history-table"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div id="rekap" class="page hidden">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                 <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Rekap Harian</h2>
+                    <div class="relative">
+                        <input type="text" id="rekap-search-input" placeholder="Cari berdasarkan tanggal (YYYY-MM-DD)..." class="pl-10 pr-4 py-2 border rounded-lg">
+                        <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th rowspan="2" class="p-3 border-b-2 border-gray-200 align-bottom">Tanggal</th>
+                                <th colspan="2" class="p-3 border-b-2 border-gray-200 text-center">Kambing</th>
+                                <th colspan="2" class="p-3 border-b-2 border-gray-200 text-center">Sapi Utuh</th>
+                                <th colspan="2" class="p-3 border-b-2 border-gray-200 text-center">1/7 Sapi</th>
+                                <th rowspan="2" class="p-3 border-b-2 border-gray-200 align-bottom text-right">Donasi Tunai (Rp)</th>
+                            </tr>
+                            <tr class="bg-gray-50">
+                                <th class="p-2 text-center font-medium text-gray-600 border-b">Jumlah</th>
+                                <th class="p-2 text-right font-medium text-gray-600 border-b">Nilai (Rp)</th>
+                                <th class="p-2 text-center font-medium text-gray-600 border-b">Jumlah</th>
+                                <th class="p-2 text-right font-medium text-gray-600 border-b">Nilai (Rp)</th>
+                                <th class="p-2 text-center font-medium text-gray-600 border-b">Jumlah</th>
+                                <th class="p-2 text-right font-medium text-gray-600 border-b">Nilai (Rp)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rekap-table"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal hidden">
+        <div class="modal-content">
+            <div class="mt-3 text-center">
+                <h3 class="text-lg leading-6 font-medium text-gray-900">Masuk</h3>
+                <div class="mt-2 px-7 py-3">
+                    <p class="text-sm text-gray-500 mb-4">Gunakan email ini untuk tes peran:</p>
+                    <p class="text-sm text-gray-500">Admin: <code class="bg-gray-200 p-1 rounded">admin@kmp.com</code></p>
+                    <p class="text-sm text-gray-500 mb-4">Staf: <code class="bg-gray-200 p-1 rounded">staff@kmp.com</code></p>
+                    <input type="email" id="email" placeholder="Email" class="mt-2 px-3 py-2 border border-gray-300 rounded-md w-full">
+                    <input type="password" id="password" placeholder="Kata Sandi" class="mt-2 px-3 py-2 border border-gray-300 rounded-md w-full">
+                </div>
+                <div class="items-center px-4 py-3">
+                    <button id="confirmLoginBtn" class="px-4 py-2 bg-indigo-500 text-white text-base font-medium rounded-md w-full shadow-sm hover:bg-indigo-600">
+                        Masuk
+                    </button>
+                    <button id="closeLoginBtn" class="mt-2 px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-full shadow-sm hover:bg-gray-300">
+                        Batal
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Modal -->
+    <div id="editModal" class="modal hidden">
+        <div class="modal-content">
+            <h3 class="text-lg font-bold text-center mb-4">Ubah Donasi</h3>
+            <form id="edit-form" class="space-y-4">
+                <input type="hidden" id="edit-doc-id">
+                <div>
+                    <label for="edit-donor-name" class="block text-sm font-medium text-gray-700">Nama Donatur</label>
+                    <input type="text" id="edit-donor-name" class="mt-1 block w-full px-3 py-2 bg-white border" required>
+                </div>
+                <div>
+                    <label for="edit-donation-source" class="block text-sm font-medium text-gray-700">Sumber Donasi</label>
+                    <select id="edit-donation-source" class="mt-1 block w-full px-3 py-2 bg-white border" required></select>
+                </div>
+                <div id="edit-tier-field" class="hidden">
+                    <label for="edit-donation-tier" class="block text-sm font-medium text-gray-700">Tipe</label>
+                    <select id="edit-donation-tier" class="mt-1 block w-full px-3 py-2 bg-white border"></select>
+                </div>
+                <div id="edit-quantity-field">
+                    <label for="edit-quantity" class="block text-sm font-medium text-gray-700">Jumlah</label>
+                    <input type="number" id="edit-quantity" min="1" class="mt-1 block w-full px-3 py-2 bg-white border" required>
+                </div>
+                 <div id="edit-price-field" class="hidden">
+                    <label for="edit-price" class="block text-sm font-medium text-gray-700">Harga (Rp)</label>
+                    <input type="number" id="edit-price" class="mt-1 block w-full px-3 py-2 bg-white border">
+                </div>
+                <div id="edit-location-field" class="hidden">
+                    <label for="edit-location" class="block text-sm font-medium text-gray-700">Lokasi</label>
+                    <input type="text" id="edit-location" class="mt-1 block w-full px-3 py-2 bg-white border">
+                </div>
+                <div class="flex justify-center space-x-4 pt-4">
+                    <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Simpan Perubahan</button>
+                    <button type="button" id="closeEditBtn" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">Batal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Confirm Delete Modal -->
+    <div id="confirmDeleteModal" class="modal hidden"></div>
+    
+    <!-- Toast Notification -->
+    <div id="toast" class="hidden fixed bottom-5 right-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg">
+        <p id="toast-message"></p>
+    </div>
+
+    <script type="module" src="script.js"></script>
+</body>
+</html>

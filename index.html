@@ -42,6 +42,10 @@
                 <i data-lucide="bar-chart-3"></i>
                 <span class="sidebar-text">Rekap</span>
             </a>
+            <a href="#" class="sidebar-icon hidden" data-page="targets" title="Target" id="nav-targets">
+                <i data-lucide="target"></i>
+                <span class="sidebar-text">Target</span>
+            </a>
         </nav>
         <div class="mt-auto">
              <div id="auth-container" class="sidebar-icon">
@@ -79,6 +83,12 @@
                         <p class="text-gray-500">Total Nilai Kambing</p>
                         <p id="total-goats-value" class="text-2xl font-bold">Rp 0</p>
                         <p id="total-goats-qty" class="text-sm text-gray-500">0 ekor</p>
+                        <div id="progress-goat" class="mt-2">
+                            <div class="text-xs font-semibold text-gray-500 mb-1">Target: <span id="target-goat-qty">0</span> ekor</div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="progress-bar-goat" class="bg-green-600 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="bg-white p-6 rounded-xl shadow-md flex items-center space-x-4">
@@ -87,6 +97,12 @@
                         <p class="text-gray-500">Total Nilai Sapi Utuh</p>
                         <p id="total-whole-cows-value" class="text-2xl font-bold">Rp 0</p>
                         <p id="total-whole-cows-qty" class="text-sm text-gray-500">0 ekor</p>
+                        <div id="progress-cow" class="mt-2">
+                            <div class="text-xs font-semibold text-gray-500 mb-1">Target: <span id="target-cow-qty">0</span> ekor</div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="progress-bar-cow" class="bg-indigo-600 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="bg-white p-6 rounded-xl shadow-md flex items-center space-x-4">
@@ -95,6 +111,12 @@
                         <p class="text-gray-500">Total Nilai 1/7 Sapi</p>
                         <p id="total-cows-value" class="text-2xl font-bold">Rp 0</p>
                         <p id="total-cows-qty" class="text-sm text-gray-500">0 bagian</p>
+                         <div id="progress-cow-share" class="mt-2">
+                            <div class="text-xs font-semibold text-gray-500 mb-1">Target: <span id="target-cow-share-qty">0</span> bagian</div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="progress-bar-cow-share" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="bg-white p-6 rounded-xl shadow-md flex items-center space-x-4">
@@ -102,6 +124,12 @@
                     <div>
                         <p class="text-gray-500">Total Donasi Tunai</p>
                         <p id="total-cash" class="text-3xl font-bold">Rp 0</p>
+                        <div id="progress-cash" class="mt-2">
+                            <div class="text-xs font-semibold text-gray-500 mb-1">Target: Rp <span id="target-cash-value">0</span></div>
+                            <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="progress-bar-cash" class="bg-yellow-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -295,12 +323,13 @@
             </div>
         </div>
         
+        <!-- Page: Recap -->
         <div id="rekap" class="page hidden">
             <div class="bg-white p-6 rounded-xl shadow-md">
                  <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold">Rekap Harian</h2>
                     <div class="relative">
-                        <input type="text" id="rekap-search-input" placeholder="Cari berdasarkan tanggal (YYYY-MM-DD)..." class="pl-10 pr-4 py-2 border rounded-lg">
+                        <input type="text" id="rekap-search-input" placeholder="Cari (YYYY-MM-DD)..." class="pl-10 pr-4 py-2 border rounded-lg">
                         <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                     </div>
                 </div>
@@ -325,6 +354,39 @@
                         </thead>
                         <tbody id="rekap-table"></tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Page: Targets (Admin Only) -->
+        <div id="targets" class="page hidden">
+            <div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-md">
+                <h2 class="text-2xl font-bold mb-6">Atur Target Donasi</h2>
+                <p id="targets-admin-notice" class="text-red-600 mb-4">Anda harus menjadi Admin untuk mengakses fitur ini.</p>
+                <div id="targets-admin-content" class="hidden">
+                    <form id="targets-form" class="space-y-6">
+                        <div>
+                            <label for="target-goat" class="block text-sm font-medium text-gray-700">Target Jumlah Kambing (ekor)</label>
+                            <input type="number" id="target-goat" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                        <div>
+                            <label for="target-cow" class="block text-sm font-medium text-gray-700">Target Jumlah Sapi Utuh (ekor)</label>
+                            <input type="number" id="target-cow" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                         <div>
+                            <label for="target-cow-share" class="block text-sm font-medium text-gray-700">Target Jumlah 1/7 Sapi (bagian)</label>
+                            <input type="number" id="target-cow-share" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                        <div>
+                            <label for="target-cash-input" class="block text-sm font-medium text-gray-700">Target Donasi Tunai (Rp)</label>
+                            <input type="number" id="target-cash-input" placeholder="Contoh: 500000000" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm" required>
+                        </div>
+                        <div>
+                            <button type="submit" class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
+                                Simpan Target
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

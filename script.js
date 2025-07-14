@@ -17,7 +17,8 @@ import {
     getDoc,
     updateDoc,
     deleteDoc,
-    serverTimestamp
+    serverTimestamp,
+    setDoc
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
 
 // --- FIREBASE CONFIGURATION ---
@@ -48,6 +49,7 @@ const db = getFirestore(app);
 let currentUser = null;
 let userRole = 'guest';
 let allDonations = []; // To store all data for client-side filtering
+let targets = {}; // To store donation targets
 let unsubscribe = null; // To detach the Firestore listener on logout
 
 // --- INITIALIZATION ---
@@ -86,6 +88,8 @@ function setupEventListeners() {
     document.getElementById('donation-tier').addEventListener('change', updatePrice);
     document.getElementById('edit-form').addEventListener('submit', handleEditSubmit);
     document.getElementById('closeEditBtn').addEventListener('click', () => closeModal('editModal'));
+    document.getElementById('targets-form').addEventListener('submit', handleTargetFormSubmit);
+
 
     // Search
     document.getElementById('stock-search-input').addEventListener('keyup', filterAndRenderData);
@@ -116,7 +120,7 @@ function showPage(pageId) {
     document.querySelectorAll('.sidebar-icon[data-page]').forEach(icon => icon.classList.remove('active'));
     document.querySelector(`.sidebar-icon[data-page='${pageId}']`).classList.add('active');
     
-    const titles = { dashboard: 'Dasbor', 'data-entry': 'Input Data', stock: 'Data & Stok Hewan', allocation: 'Alokasi', rekap: 'Rekap' };
+    const titles = { dashboard: 'Dasbor', 'data-entry': 'Input Data', stock: 'Data & Stok Hewan', allocation: 'Alokasi', rekap: 'Rekap', targets: 'Atur Target' };
     document.getElementById('page-title').textContent = titles[pageId] || 'Dasbor';
 }
 
@@ -175,13 +179,22 @@ function updateUIForRole() {
     const adminContent = document.getElementById('admin-content');
     const adminNotice = document.getElementById('admin-notice');
     const dataEntryPage = document.getElementById('data-entry');
+    const targetsAdminContent = document.getElementById('targets-admin-content');
+    const targetsAdminNotice = document.getElementById('targets-admin-notice');
+    const navTargets = document.getElementById('nav-targets');
 
     if (userRole === 'admin') {
         adminNotice.classList.add('hidden');
         adminContent.classList.remove('hidden');
+        targetsAdminNotice.classList.add('hidden');
+        targetsAdminContent.classList.remove('hidden');
+        navTargets.classList.remove('hidden');
     } else {
         adminNotice.classList.remove('hidden');
         adminContent.classList.add('hidden');
+        targetsAdminNotice.classList.remove('hidden');
+        targetsAdminContent.classList.add('hidden');
+        navTargets.classList.add('hidden');
     }
     if (userRole === 'guest') {
         dataEntryPage.classList.add('opacity-50', 'pointer-events-none');
@@ -268,9 +281,48 @@ async function handleFormSubmit(e) {
     }
 }
 
+async function handleTargetFormSubmit(e) {
+    e.preventDefault();
+    if (userRole !== 'admin') return showToast("Hanya admin yang bisa mengatur target.", "error");
+
+    const newTargets = {
+        goat: parseInt(document.getElementById('target-goat').value, 10) || 0,
+        cow_whole: parseInt(document.getElementById('target-cow').value, 10) || 0,
+        cow_share: parseInt(document.getElementById('target-cow-share').value, 10) || 0,
+        cash: parseInt(document.getElementById('target-cash-input').value, 10) || 0
+    };
+
+    try {
+        await setDoc(doc(db, "app_config", "targets"), newTargets);
+        showToast("Target berhasil disimpan!", "success");
+        await fetchTargets(); // Re-fetch to update state
+        filterAndRenderData(); // Re-render dashboard with new targets
+    } catch (error) {
+        showToast(`Error menyimpan target: ${error.message}`, "error");
+    }
+}
+
 // --- DATA FETCHING & RENDERING ---
+async function fetchTargets() {
+    const docRef = doc(db, "app_config", "targets");
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        targets = docSnap.data();
+        // Populate the form fields on the targets page
+        document.getElementById('target-goat').value = targets.goat || 0;
+        document.getElementById('target-cow').value = targets.cow_whole || 0;
+        document.getElementById('target-cow-share').value = targets.cow_share || 0;
+        document.getElementById('target-cash-input').value = targets.cash || 0;
+    } else {
+        console.log("No targets set yet.");
+        targets = { goat: 0, cow_whole: 0, cow_share: 0, cash: 0 };
+    }
+}
+
 function attachFirestoreListener() {
     if (unsubscribe) unsubscribe(); 
+
+    fetchTargets();
 
     unsubscribe = onSnapshot(query(collection(db, 'donations')), (snapshot) => {
         allDonations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -346,6 +398,30 @@ function renderDashboard(totals) {
     document.getElementById('total-cows-value').textContent = format(totals.cow_share.value);
     document.getElementById('total-cows-qty').textContent = `${totals.cow_share.qty} bagian`;
     document.getElementById('total-cash').textContent = format(totals.cash.value);
+
+    // Goat Progress
+    const targetGoat = targets.goat || 0;
+    const progressGoat = targetGoat > 0 ? (totals.goat.qty / targetGoat) * 100 : 0;
+    document.getElementById('target-goat-qty').textContent = targetGoat.toLocaleString('id-ID');
+    document.getElementById('progress-bar-goat').style.width = `${Math.min(progressGoat, 100)}%`;
+
+    // Cow Progress
+    const targetCow = targets.cow_whole || 0;
+    const progressCow = targetCow > 0 ? (totals.cow_whole.qty / targetCow) * 100 : 0;
+    document.getElementById('target-cow-qty').textContent = targetCow.toLocaleString('id-ID');
+    document.getElementById('progress-bar-cow').style.width = `${Math.min(progressCow, 100)}%`;
+
+    // Cow Share Progress
+    const targetCowShare = targets.cow_share || 0;
+    const progressCowShare = targetCowShare > 0 ? (totals.cow_share.qty / targetCowShare) * 100 : 0;
+    document.getElementById('target-cow-share-qty').textContent = targetCowShare.toLocaleString('id-ID');
+    document.getElementById('progress-bar-cow-share').style.width = `${Math.min(progressCowShare, 100)}%`;
+
+    // Cash Progress
+    const targetCash = targets.cash || 0;
+    const progressCash = targetCash > 0 ? (totals.cash.value / targetCash) * 100 : 0;
+    document.getElementById('target-cash-value').textContent = targetCash.toLocaleString('id-ID');
+    document.getElementById('progress-bar-cash').style.width = `${Math.min(progressCash, 100)}%`;
 }
 
 function renderRecentDonations(donations) {

@@ -46,6 +46,10 @@
                 <i data-lucide="target"></i>
                 <span class="sidebar-text">Target</span>
             </a>
+            <a href="#" class="sidebar-icon hidden" data-page="user-management" title="Manajemen Pengguna" id="nav-user-management">
+                <i data-lucide="users"></i>
+                <span class="sidebar-text">Manajemen Pengguna</span>
+            </a>
         </nav>
         <div class="mt-auto">
              <div id="auth-container" class="sidebar-icon">
@@ -329,7 +333,7 @@
                  <div class="flex justify-between items-center mb-4">
                     <h2 class="text-xl font-bold">Rekap Harian</h2>
                     <div class="relative">
-                        <input type="text" id="rekap-search-input" placeholder="Cari (YYYY-MM-DD)..." class="pl-10 pr-4 py-2 border rounded-lg">
+                        <input type="text" id="rekap-search-input" placeholder="Cari berdasarkan tanggal (YYYY-MM-DD)..." class="pl-10 pr-4 py-2 border rounded-lg">
                         <i data-lucide="search" class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
                     </div>
                 </div>
@@ -387,6 +391,30 @@
                             </button>
                         </div>
                     </form>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Page: User Management (Admin Only) -->
+        <div id="user-management" class="page hidden">
+            <div class="bg-white p-6 rounded-xl shadow-md">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Manajemen Pengguna</h2>
+                </div>
+                <p id="user-management-admin-notice" class="text-red-600 mb-4">Anda harus menjadi Admin untuk mengakses fitur ini.</p>
+                <div id="user-management-admin-content" class="hidden overflow-x-auto">
+                    <table class="w-full text-left">
+                        <thead>
+                            <tr class="bg-gray-50 border-b">
+                                <th class="p-3">Email</th>
+                                <th class="p-3">Peran Saat Ini</th>
+                                <th class="p-3">Ubah Peran</th>
+                            </tr>
+                        </thead>
+                        <tbody id="user-list-table">
+                            <!-- User list will be populated by script.js -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

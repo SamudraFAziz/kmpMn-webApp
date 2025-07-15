@@ -15,6 +15,7 @@ import {
     query,
     doc,
     getDoc,
+    getDocs,
     updateDoc,
     deleteDoc,
     serverTimestamp,
@@ -48,9 +49,10 @@ const db = getFirestore(app);
 // --- GLOBAL STATE ---
 let currentUser = null;
 let userRole = 'guest';
-let allDonations = []; // To store all data for client-side filtering
-let targets = {}; // To store donation targets
-let unsubscribe = null; // To detach the Firestore listener on logout
+let allDonations = [];
+let targets = {};
+let allUsers = [];
+let unsubscribe = null;
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -72,7 +74,11 @@ function setupEventListeners() {
     document.querySelectorAll('.sidebar-icon[data-page]').forEach(icon => {
         icon.addEventListener('click', (e) => {
             e.preventDefault();
-            showPage(icon.getAttribute('data-page'));
+            const pageId = icon.getAttribute('data-page');
+            showPage(pageId);
+            if (pageId === 'user-management' && userRole === 'admin') {
+                fetchUsers();
+            }
         });
     });
 
@@ -90,7 +96,6 @@ function setupEventListeners() {
     document.getElementById('closeEditBtn').addEventListener('click', () => closeModal('editModal'));
     document.getElementById('targets-form').addEventListener('submit', handleTargetFormSubmit);
 
-
     // Search
     document.getElementById('stock-search-input').addEventListener('keyup', filterAndRenderData);
     document.getElementById('rekap-search-input').addEventListener('keyup', filterAndRenderData);
@@ -98,7 +103,8 @@ function setupEventListeners() {
 
 // --- MODAL HANDLING ---
 const openModal = (modalId) => document.getElementById(modalId).classList.remove('hidden');
-const closeModal = (modalId) => document.getElementById(modalId).classList.add('hidden');
+// FIX: Attach closeModal to the window object to make it globally accessible for onclick attributes
+window.closeModal = (modalId) => document.getElementById(modalId).classList.add('hidden');
 
 // --- SIDEBAR ---
 function applySidebarPreference() {
@@ -120,7 +126,15 @@ function showPage(pageId) {
     document.querySelectorAll('.sidebar-icon[data-page]').forEach(icon => icon.classList.remove('active'));
     document.querySelector(`.sidebar-icon[data-page='${pageId}']`).classList.add('active');
     
-    const titles = { dashboard: 'Dasbor', 'data-entry': 'Input Data', stock: 'Data & Stok Hewan', allocation: 'Alokasi', rekap: 'Rekap', targets: 'Atur Target' };
+    const titles = { 
+        dashboard: 'Dasbor', 
+        'data-entry': 'Input Data', 
+        stock: 'Data & Stok Hewan', 
+        allocation: 'Alokasi', 
+        rekap: 'Rekap', 
+        targets: 'Atur Target',
+        'user-management': 'Manajemen Pengguna'
+    };
     document.getElementById('page-title').textContent = titles[pageId] || 'Dasbor';
 }
 
@@ -148,17 +162,40 @@ async function handleLogin() {
     }
 }
 
-onAuthStateChanged(auth, (user) => {
-    currentUser = user;
+onAuthStateChanged(auth, async (user) => {
     const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
 
     if (user) {
         loginBtn.classList.add('hidden');
         logoutBtn.classList.remove('hidden');
-        userRole = user.email === 'admin@kmp.com' ? 'admin' : 'staff';
+        
+        const userDocRef = doc(db, "users", user.uid);
+        const userDocSnap = await getDoc(userDocRef);
+
+        if (userDocSnap.exists()) {
+            userRole = userDocSnap.data().role;
+        } else {
+            // This is a new user, create their profile in Firestore
+            const newRole = user.email === 'admin@kmp.com' ? 'admin' : 'staff';
+            try {
+                await setDoc(userDocRef, {
+                    email: user.email,
+                    role: newRole,
+                    createdAt: serverTimestamp()
+                });
+                userRole = newRole;
+            } catch (error) {
+                console.error("Error creating user profile:", error);
+                showToast("Gagal membuat profil pengguna.", "error");
+                userRole = 'guest'; // Fallback role
+            }
+        }
+        
+        currentUser = user;
         document.getElementById('userInfo').innerHTML = `Masuk sebagai: <strong>${user.email}</strong> <br> Peran: <span class="font-bold text-indigo-600">${userRole.toUpperCase()}</span>`;
         attachFirestoreListener();
+
     } else {
         currentUser = null;
         userRole = 'guest';
@@ -174,14 +211,20 @@ onAuthStateChanged(auth, (user) => {
     updateUIForRole();
 });
 
+
 // --- ROLE-BASED UI ---
 function updateUIForRole() {
     const adminContent = document.getElementById('admin-content');
     const adminNotice = document.getElementById('admin-notice');
     const dataEntryPage = document.getElementById('data-entry');
+    
     const targetsAdminContent = document.getElementById('targets-admin-content');
     const targetsAdminNotice = document.getElementById('targets-admin-notice');
     const navTargets = document.getElementById('nav-targets');
+
+    const userManagementAdminContent = document.getElementById('user-management-admin-content');
+    const userManagementAdminNotice = document.getElementById('user-management-admin-notice');
+    const navUserManagement = document.getElementById('nav-user-management');
 
     if (userRole === 'admin') {
         adminNotice.classList.add('hidden');
@@ -189,13 +232,20 @@ function updateUIForRole() {
         targetsAdminNotice.classList.add('hidden');
         targetsAdminContent.classList.remove('hidden');
         navTargets.classList.remove('hidden');
+        userManagementAdminNotice.classList.add('hidden');
+        userManagementAdminContent.classList.remove('hidden');
+        navUserManagement.classList.remove('hidden');
     } else {
         adminNotice.classList.remove('hidden');
         adminContent.classList.add('hidden');
         targetsAdminNotice.classList.remove('hidden');
         targetsAdminContent.classList.add('hidden');
         navTargets.classList.add('hidden');
+        userManagementAdminNotice.classList.remove('hidden');
+        userManagementAdminContent.classList.add('hidden');
+        navUserManagement.classList.add('hidden');
     }
+
     if (userRole === 'guest') {
         dataEntryPage.classList.add('opacity-50', 'pointer-events-none');
     } else {
@@ -203,6 +253,62 @@ function updateUIForRole() {
     }
     filterAndRenderData();
 }
+
+// --- USER MANAGEMENT ---
+async function fetchUsers() {
+    if (userRole !== 'admin') return;
+    try {
+        const querySnapshot = await getDocs(collection(db, "users"));
+        allUsers = querySnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
+        renderUserManagementPage();
+    } catch (error) {
+        console.error("Error fetching users:", error);
+        showToast("Gagal memuat daftar pengguna.", "error");
+    }
+}
+
+function renderUserManagementPage() {
+    const tableBody = document.getElementById('user-list-table');
+    if (!tableBody) return;
+
+    tableBody.innerHTML = allUsers.map(user => {
+        const isCurrentUser = user.uid === currentUser.uid;
+        const disabled = isCurrentUser ? 'disabled' : '';
+        const note = isCurrentUser ? '<span class="text-xs text-gray-500 ml-2">(Anda)</span>' : '';
+
+        return `
+            <tr class="border-b hover:bg-gray-50">
+                <td class="p-3">${user.email} ${note}</td>
+                <td class="p-3 font-semibold">${user.role.toUpperCase()}</td>
+                <td class="p-3">
+                    <select onchange="updateUserRole('${user.uid}', this.value)" ${disabled} class="p-2 border rounded-md bg-white">
+                        <option value="staff" ${user.role === 'staff' ? 'selected' : ''}>Staff</option>
+                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                </td>
+            </tr>
+        `;
+    }).join('');
+}
+
+window.updateUserRole = async (uid, newRole) => {
+    if (userRole !== 'admin') return showToast("Hanya admin yang bisa mengubah peran.", "error");
+    if (uid === currentUser.uid) return showToast("Anda tidak bisa mengubah peran Anda sendiri.", "error");
+
+    const userDocRef = doc(db, "users", uid);
+    try {
+        await updateDoc(userDocRef, { role: newRole });
+        showToast("Peran pengguna berhasil diperbarui.", "success");
+        // Update local state and re-render
+        const userToUpdate = allUsers.find(u => u.uid === uid);
+        if (userToUpdate) userToUpdate.role = newRole;
+        renderUserManagementPage();
+    } catch (error) {
+        console.error("Error updating user role:", error);
+        showToast("Gagal memperbarui peran pengguna.", "error");
+    }
+};
+
 
 // --- DATA ENTRY FORM LOGIC ---
 function updatePrice() {
@@ -304,18 +410,20 @@ async function handleTargetFormSubmit(e) {
 
 // --- DATA FETCHING & RENDERING ---
 async function fetchTargets() {
-    const docRef = doc(db, "app_config", "targets");
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-        targets = docSnap.data();
-        // Populate the form fields on the targets page
-        document.getElementById('target-goat').value = targets.goat || 0;
-        document.getElementById('target-cow').value = targets.cow_whole || 0;
-        document.getElementById('target-cow-share').value = targets.cow_share || 0;
-        document.getElementById('target-cash-input').value = targets.cash || 0;
-    } else {
-        console.log("No targets set yet.");
-        targets = { goat: 0, cow_whole: 0, cow_share: 0, cash: 0 };
+    try {
+        const docRef = doc(db, "app_config", "targets");
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            targets = docSnap.data();
+            document.getElementById('target-goat').value = targets.goat || 0;
+            document.getElementById('target-cow').value = targets.cow_whole || 0;
+            document.getElementById('target-cow-share').value = targets.cow_share || 0;
+            document.getElementById('target-cash-input').value = targets.cash || 0;
+        } else {
+            targets = { goat: 0, cow_whole: 0, cow_share: 0, cash: 0 };
+        }
+    } catch (error) {
+        console.error("Error fetching targets:", error);
     }
 }
 
@@ -426,7 +534,7 @@ function renderDashboard(totals) {
 
 function renderRecentDonations(donations) {
     const tableBody = document.getElementById('recent-donations-table');
-    donations.sort((a,b) => b.createdAt.seconds - a.createdAt.seconds);
+    donations.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
     tableBody.innerHTML = donations.slice(0, 10).map(don => {
         const actions = userRole === 'admin' ? `<td class="p-3 text-center"><button onclick="openEditModal('${don.id}')" class="action-btn" title="Ubah"><i data-lucide="edit"></i></button><button onclick="openDeleteModal('${don.id}')" class="action-btn text-red-500 hover:text-red-700" title="Hapus"><i data-lucide="trash-2"></i></button></td>` : '<td></td>';
         return `
@@ -453,7 +561,7 @@ function renderStockPage(unallocated, allocated, cash) {
             <td class="p-3">${item.donorName}</td>
             <td class="p-3">${item.type.replace(/_/g, ' ')} (${item.quantity})</td>
             <td class="p-3">${item.tier}</td>
-            <td class="p-3">${new Date(item.createdAt.seconds * 1000).toLocaleDateString()}</td>
+            <td class="p-3">${new Date((item.createdAt?.seconds || 0) * 1000).toLocaleDateString()}</td>
             <td class="p-3">${item.source}</td>
             ${actions}
         </tr>`;
@@ -484,7 +592,7 @@ function renderStockPage(unallocated, allocated, cash) {
         <tr class="border-b hover:bg-gray-50">
             <td class="p-3 font-mono text-xs">${item.displayId}</td>
             <td class="p-3">${item.donorName}</td>
-            <td class="p-3">${new Date(item.createdAt.seconds * 1000).toLocaleDateString()}</td>
+            <td class="p-3">${new Date((item.createdAt?.seconds || 0) * 1000).toLocaleDateString()}</td>
             <td class="p-3">${item.source}</td>
             <td class="p-3 text-right">Rp ${item.totalValue.toLocaleString('id-ID')}</td>
             ${actions}

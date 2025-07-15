@@ -83,3 +83,17 @@ main {
 .action-btn:hover {
     color: #1f2937; /* text-gray-800 */
 }
+
+/* --- Export Button Styles --- */
+.export-btn {
+    padding: 0.5rem 1rem; /* py-2 px-4 */
+    background-color: #10b981; /* bg-green-600 */
+    color: white;
+    border-radius: 0.375rem; /* rounded-md */
+    font-size: 0.875rem; /* text-sm */
+    font-weight: 500; /* font-medium */
+    transition: background-color 0.2s ease-in-out;
+}
+.export-btn:hover {
+    background-color: #059669; /* hover:bg-green-700 */
+}

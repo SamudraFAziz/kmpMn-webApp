@@ -99,11 +99,16 @@ function setupEventListeners() {
     // Search
     document.getElementById('stock-search-input').addEventListener('keyup', filterAndRenderData);
     document.getElementById('rekap-search-input').addEventListener('keyup', filterAndRenderData);
+    
+    // Export Buttons
+    document.getElementById('export-stock-csv').addEventListener('click', () => exportData('stock', 'csv'));
+    document.getElementById('export-stock-xlsx').addEventListener('click', () => exportData('stock', 'xlsx'));
+    document.getElementById('export-rekap-csv').addEventListener('click', () => exportData('rekap', 'csv'));
+    document.getElementById('export-rekap-xlsx').addEventListener('click', () => exportData('rekap', 'xlsx'));
 }
 
 // --- MODAL HANDLING ---
 const openModal = (modalId) => document.getElementById(modalId).classList.remove('hidden');
-// FIX: Attach closeModal to the window object to make it globally accessible for onclick attributes
 window.closeModal = (modalId) => document.getElementById(modalId).classList.add('hidden');
 
 // --- SIDEBAR ---
@@ -133,7 +138,7 @@ function showPage(pageId) {
         allocation: 'Alokasi', 
         rekap: 'Rekap', 
         targets: 'Atur Target',
-        'user-management': 'Manajemen Pengguna'
+        'user-management': 'Manajemen User'
     };
     document.getElementById('page-title').textContent = titles[pageId] || 'Dasbor';
 }
@@ -176,7 +181,6 @@ onAuthStateChanged(auth, async (user) => {
         if (userDocSnap.exists()) {
             userRole = userDocSnap.data().role;
         } else {
-            // This is a new user, create their profile in Firestore
             const newRole = user.email === 'admin@kmp.com' ? 'admin' : 'staff';
             try {
                 await setDoc(userDocRef, {
@@ -188,7 +192,7 @@ onAuthStateChanged(auth, async (user) => {
             } catch (error) {
                 console.error("Error creating user profile:", error);
                 showToast("Gagal membuat profil pengguna.", "error");
-                userRole = 'guest'; // Fallback role
+                userRole = 'guest';
             }
         }
         
@@ -299,7 +303,6 @@ window.updateUserRole = async (uid, newRole) => {
     try {
         await updateDoc(userDocRef, { role: newRole });
         showToast("Peran pengguna berhasil diperbarui.", "success");
-        // Update local state and re-render
         const userToUpdate = allUsers.find(u => u.uid === uid);
         if (userToUpdate) userToUpdate.role = newRole;
         renderUserManagementPage();
@@ -401,8 +404,8 @@ async function handleTargetFormSubmit(e) {
     try {
         await setDoc(doc(db, "app_config", "targets"), newTargets);
         showToast("Target berhasil disimpan!", "success");
-        await fetchTargets(); // Re-fetch to update state
-        filterAndRenderData(); // Re-render dashboard with new targets
+        await fetchTargets();
+        filterAndRenderData();
     } catch (error) {
         showToast(`Error menyimpan target: ${error.message}`, "error");
     }
@@ -444,7 +447,7 @@ function filterAndRenderData() {
     const stockSearchTerm = document.getElementById('stock-search-input').value.toLowerCase();
     
     const filteredDonations = allDonations.filter(don => {
-        return !stockSearchTerm || 
+         return !stockSearchTerm || 
                (don.donorName && don.donorName.toLowerCase().includes(stockSearchTerm)) ||
                (don.displayId && don.displayId.toLowerCase().includes(stockSearchTerm)) ||
                (don.tier && don.tier.toLowerCase().includes(stockSearchTerm)) ||
@@ -507,25 +510,22 @@ function renderDashboard(totals) {
     document.getElementById('total-cows-qty').textContent = `${totals.cow_share.qty} bagian`;
     document.getElementById('total-cash').textContent = format(totals.cash.value);
 
-    // Goat Progress
+    // Progress Bars
     const targetGoat = targets.goat || 0;
     const progressGoat = targetGoat > 0 ? (totals.goat.qty / targetGoat) * 100 : 0;
     document.getElementById('target-goat-qty').textContent = targetGoat.toLocaleString('id-ID');
     document.getElementById('progress-bar-goat').style.width = `${Math.min(progressGoat, 100)}%`;
 
-    // Cow Progress
     const targetCow = targets.cow_whole || 0;
     const progressCow = targetCow > 0 ? (totals.cow_whole.qty / targetCow) * 100 : 0;
     document.getElementById('target-cow-qty').textContent = targetCow.toLocaleString('id-ID');
     document.getElementById('progress-bar-cow').style.width = `${Math.min(progressCow, 100)}%`;
 
-    // Cow Share Progress
     const targetCowShare = targets.cow_share || 0;
     const progressCowShare = targetCowShare > 0 ? (totals.cow_share.qty / targetCowShare) * 100 : 0;
     document.getElementById('target-cow-share-qty').textContent = targetCowShare.toLocaleString('id-ID');
     document.getElementById('progress-bar-cow-share').style.width = `${Math.min(progressCowShare, 100)}%`;
 
-    // Cash Progress
     const targetCash = targets.cash || 0;
     const progressCash = targetCash > 0 ? (totals.cash.value / targetCash) * 100 : 0;
     document.getElementById('target-cash-value').textContent = targetCash.toLocaleString('id-ID');
@@ -603,6 +603,7 @@ function renderStockPage(unallocated, allocated, cash) {
     lucide.createIcons();
 }
 
+
 function renderAllocationPage(unallocated, allocated) {
     const list = document.getElementById('allocation-stock-list');
     list.innerHTML = unallocated.map(item => `
@@ -653,6 +654,97 @@ function renderRekapPage(rekapData) {
             </tr>`;
     }).join('');
 }
+
+// --- DATA EXPORT ---
+function exportData(page, format) {
+    let data;
+    let headers;
+    let filename;
+
+    if (page === 'stock') {
+        const stockSearchTerm = document.getElementById('stock-search-input').value.toLowerCase();
+        const filteredData = allDonations.filter(don => {
+             return !stockSearchTerm || 
+               (don.donorName && don.donorName.toLowerCase().includes(stockSearchTerm)) ||
+               (don.displayId && don.displayId.toLowerCase().includes(stockSearchTerm)) ||
+               (don.tier && don.tier.toLowerCase().includes(stockSearchTerm)) ||
+               (don.location && don.location.toLowerCase().includes(stockSearchTerm)) ||
+               (don.source && don.source.toLowerCase().includes(stockSearchTerm));
+        });
+
+        headers = ["ID Donasi", "Donatur", "Jenis", "Tipe", "Jumlah/Nilai", "Tanggal Masuk", "Sumber", "Status", "Lokasi", "Dialokasikan Oleh"];
+        data = filteredData.map(item => [
+            item.displayId || '',
+            item.donorName || '',
+            item.type.replace(/_/g, ' ') || '',
+            item.tier || (item.type === 'cash' ? 'Tunai' : ''),
+            item.type === 'cash' ? item.totalValue : item.quantity,
+            item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : '',
+            item.source || '',
+            item.status || '',
+            item.location || '',
+            item.allocatedBy || ''
+        ]);
+        filename = `Laporan_Data_Dan_Stok_KMP_${new Date().toISOString().split('T')[0]}`;
+    } else if (page === 'rekap') {
+        const rekapData = {};
+        allDonations.forEach(data => {
+            if (data.createdAt) {
+                const date = new Date(data.createdAt.seconds * 1000).toISOString().split('T')[0];
+                if (!rekapData[date]) rekapData[date] = { goat_qty:0, goat_val:0, cow_whole_qty:0, cow_whole_val:0, cow_share_qty:0, cow_share_val:0, cash_val:0 };
+                if (data.type === 'goat') { rekapData[date].goat_qty += data.quantity; rekapData[date].goat_val += data.totalValue; }
+                if (data.type === 'cow_whole') { rekapData[date].cow_whole_qty += data.quantity; rekapData[date].cow_whole_val += data.totalValue; }
+                if (data.type === 'cow_share') { rekapData[date].cow_share_qty += data.quantity; rekapData[date].cow_share_val += data.totalValue; }
+                if (data.type === 'cash') { rekapData[date].cash_val += data.totalValue; }
+            }
+        });
+        
+        headers = ["Tanggal", "Kambing (Jumlah)", "Kambing (Nilai)", "Sapi Utuh (Jumlah)", "Sapi Utuh (Nilai)", "1/7 Sapi (Jumlah)", "1/7 Sapi (Nilai)", "Donasi Tunai (Nilai)"];
+        const searchTerm = document.getElementById('rekap-search-input').value.toLowerCase();
+        data = Object.keys(rekapData)
+            .filter(date => date.includes(searchTerm))
+            .sort((a,b) => new Date(b) - new Date(a))
+            .map(date => {
+                const dayData = rekapData[date];
+                return [date, dayData.goat_qty, dayData.goat_val, dayData.cow_whole_qty, dayData.cow_whole_val, dayData.cow_share_qty, dayData.cow_share_val, dayData.cash_val];
+            });
+        filename = `Rekap_Harian_KMP_${new Date().toISOString().split('T')[0]}`;
+    }
+
+    if (format === 'csv') {
+        exportToCsv(filename, headers, data);
+    } else if (format === 'xlsx') {
+        exportToXlsx(filename, headers, data);
+    }
+}
+
+function exportToCsv(filename, headers, data) {
+    const csvContent = [
+        headers.join(','),
+        ...data.map(row => row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    if (link.download !== undefined) {
+        const url = URL.createObjectURL(blob);
+        link.setAttribute("href", url);
+        link.setAttribute("download", `${filename}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+}
+
+function exportToXlsx(filename, headers, data) {
+    const ws_data = [headers, ...data];
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Laporan");
+    XLSX.writeFile(wb, `${filename}.xlsx`);
+}
+
 
 // --- ADMIN TOOLS ---
 window.openEditModal = async (docId) => {

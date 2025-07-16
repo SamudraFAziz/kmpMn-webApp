@@ -53,6 +53,7 @@ let allDonations = [];
 let targets = {};
 let allUsers = [];
 let unsubscribe = null;
+let currentRawPrice = 0; // To hold the unformatted total price for submission
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -92,6 +93,8 @@ function setupEventListeners() {
     document.getElementById('donation-form').addEventListener('submit', handleFormSubmit);
     document.getElementById('donation-type').addEventListener('change', handleDonationTypeChange);
     document.getElementById('donation-tier').addEventListener('change', updatePrice);
+    document.getElementById('quantity').addEventListener('input', updatePrice); // Recalculate on quantity change
+    document.getElementById('discount').addEventListener('input', updatePrice); // Recalculate on discount change
     document.getElementById('edit-form').addEventListener('submit', handleEditSubmit);
     document.getElementById('closeEditBtn').addEventListener('click', () => closeModal('editModal'));
     document.getElementById('targets-form').addEventListener('submit', handleTargetFormSubmit);
@@ -138,7 +141,7 @@ function showPage(pageId) {
         allocation: 'Alokasi', 
         rekap: 'Rekap', 
         targets: 'Atur Target',
-        'user-management': 'Manajemen User'
+        'user-management': 'Manajemen Pengguna'
     };
     document.getElementById('page-title').textContent = titles[pageId] || 'Dasbor';
 }
@@ -315,32 +318,52 @@ window.updateUserRole = async (uid, newRole) => {
 
 // --- DATA ENTRY FORM LOGIC ---
 function updatePrice() {
-    const donationTypeSelect = document.getElementById('donation-type');
-    const donationTierSelect = document.getElementById('donation-tier');
-    const priceInput = document.getElementById('price');
-    const type = donationTypeSelect.value;
-    const tier = donationTierSelect.value;
-    priceInput.value = (prices[type] && prices[type][tier]) ? prices[type][tier] : '';
+    const type = document.getElementById('donation-type').value;
+    if (type === 'cash') return; // Do nothing for cash donations
+
+    const tier = document.getElementById('donation-tier').value;
+    const quantity = parseInt(document.getElementById('quantity').value, 10) || 1;
+    const discount = parseInt(document.getElementById('discount').value, 10) || 0;
+    const priceDisplayInput = document.getElementById('price-display');
+
+    const basePrice = (prices[type] && prices[type][tier]) ? prices[type][tier] : 0;
+    
+    const totalBeforeDiscount = basePrice * quantity;
+    const finalPrice = totalBeforeDiscount - discount;
+    
+    currentRawPrice = finalPrice < 0 ? 0 : finalPrice;
+    priceDisplayInput.value = currentRawPrice.toLocaleString('id-ID');
 }
 
 function handleDonationTypeChange() {
     const donationTypeSelect = document.getElementById('donation-type');
     const tierField = document.getElementById('tier-field');
     const quantityField = document.getElementById('quantity-field');
-    const priceInput = document.getElementById('price');
+    const priceDisplayInput = document.getElementById('price-display');
+    const discountField = document.getElementById('discount-field');
     const donationTierSelect = document.getElementById('donation-tier');
     const type = donationTypeSelect.value;
     
+    // Reset fields
     donationTierSelect.innerHTML = '';
-    priceInput.value = '';
+    priceDisplayInput.value = '';
+    document.getElementById('discount').value = '';
+    document.getElementById('quantity').value = '1';
+    currentRawPrice = 0;
 
     const isCash = type === 'cash';
-    tierField.classList.toggle('hidden', isCash || !prices[type]);
-    quantityField.classList.toggle('hidden', isCash);
-    priceInput.readOnly = !isCash;
-    priceInput.classList.toggle('bg-gray-200', !isCash);
-    priceInput.placeholder = isCash ? 'Masukkan jumlah' : 'Harga akan terisi otomatis';
     
+    // Toggle visibility
+    tierField.classList.toggle('hidden', isCash || !type);
+    discountField.classList.toggle('hidden', isCash || !type);
+    quantityField.classList.toggle('hidden', isCash);
+    
+    // Handle price input state
+    priceDisplayInput.readOnly = !isCash;
+    priceDisplayInput.classList.toggle('bg-gray-200', !isCash);
+    priceDisplayInput.classList.toggle('bg-white', isCash);
+    priceDisplayInput.placeholder = isCash ? 'Masukkan jumlah donasi' : 'Harga akan terisi otomatis';
+
     if (!isCash && prices[type]) {
         Object.keys(prices[type]).forEach(tierName => {
             const option = document.createElement('option');
@@ -348,8 +371,10 @@ function handleDonationTypeChange() {
             option.textContent = tierName;
             donationTierSelect.appendChild(option);
         });
-        updatePrice();
     }
+    
+    // Initial price calculation
+    updatePrice();
 }
 
 // --- FORM SUBMISSION ---
@@ -358,19 +383,37 @@ async function handleFormSubmit(e) {
     if (!currentUser) return showToast("Anda harus masuk untuk mengirim data.", "error");
 
     const type = document.getElementById('donation-type').value;
-    const price = parseFloat(document.getElementById('price').value);
-    const quantity = type === 'cash' ? 1 : parseInt(document.getElementById('quantity').value, 10);
+    const notes = document.getElementById('notes').value;
+    let totalValue, pricePerUnit, quantity, discount, tier;
 
-    if (!type || !price || price <= 0) return showToast("Data tidak lengkap atau harga tidak valid.", "error");
+    if (type === 'cash') {
+        totalValue = parseInt(document.getElementById('price-display').value.replace(/[^0-9]/g, ''), 10) || 0;
+        pricePerUnit = totalValue;
+        quantity = 1;
+        discount = 0;
+        tier = null;
+    } else {
+        quantity = parseInt(document.getElementById('quantity').value, 10) || 1;
+        discount = parseInt(document.getElementById('discount').value, 10) || 0;
+        tier = document.getElementById('donation-tier').value;
+        const basePrice = (prices[type] && prices[type][tier]) ? prices[type][tier] : 0;
+        
+        totalValue = (basePrice * quantity) - discount;
+        pricePerUnit = quantity > 0 ? totalValue / quantity : 0;
+    }
+
+    if (!type || totalValue < 0) return showToast("Data tidak lengkap atau harga tidak valid.", "error");
 
     const newDonation = {
         donorName: document.getElementById('donor-name').value,
         source: document.getElementById('donation-source').value,
         type: type,
-        tier: type === 'cash' ? null : document.getElementById('donation-tier').value,
-        price: price,
+        tier: tier,
+        price: pricePerUnit,
         quantity: quantity,
-        totalValue: price * quantity,
+        discount: discount,
+        notes: notes,
+        totalValue: totalValue,
         createdAt: serverTimestamp(),
         createdBy: currentUser.email,
         status: type === 'cash' ? 'N/A' : 'unallocated',
@@ -660,30 +703,34 @@ function exportData(page, format) {
     let data;
     let headers;
     let filename;
+    
+    const stockSearchTerm = document.getElementById('stock-search-input').value.toLowerCase();
+    const filteredData = allDonations.filter(don => {
+         return !stockSearchTerm || 
+           (don.donorName && don.donorName.toLowerCase().includes(stockSearchTerm)) ||
+           (don.displayId && don.displayId.toLowerCase().includes(stockSearchTerm)) ||
+           (don.tier && don.tier.toLowerCase().includes(stockSearchTerm)) ||
+           (don.location && don.location.toLowerCase().includes(stockSearchTerm)) ||
+           (don.source && don.source.toLowerCase().includes(stockSearchTerm));
+    });
 
     if (page === 'stock') {
-        const stockSearchTerm = document.getElementById('stock-search-input').value.toLowerCase();
-        const filteredData = allDonations.filter(don => {
-             return !stockSearchTerm || 
-               (don.donorName && don.donorName.toLowerCase().includes(stockSearchTerm)) ||
-               (don.displayId && don.displayId.toLowerCase().includes(stockSearchTerm)) ||
-               (don.tier && don.tier.toLowerCase().includes(stockSearchTerm)) ||
-               (don.location && don.location.toLowerCase().includes(stockSearchTerm)) ||
-               (don.source && don.source.toLowerCase().includes(stockSearchTerm));
-        });
-
-        headers = ["ID Donasi", "Donatur", "Jenis", "Tipe", "Jumlah/Nilai", "Tanggal Masuk", "Sumber", "Status", "Lokasi", "Dialokasikan Oleh"];
+        headers = ["ID Donasi", "Donatur", "Jenis", "Tipe", "Jumlah", "Harga Satuan", "Diskon", "Total Nilai", "Tanggal Masuk", "Sumber", "Status", "Lokasi", "Dialokasikan Oleh", "Catatan"];
         data = filteredData.map(item => [
             item.displayId || '',
             item.donorName || '',
             item.type.replace(/_/g, ' ') || '',
             item.tier || (item.type === 'cash' ? 'Tunai' : ''),
-            item.type === 'cash' ? item.totalValue : item.quantity,
+            item.quantity || 0,
+            item.price || 0,
+            item.discount || 0,
+            item.totalValue || 0,
             item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : '',
             item.source || '',
             item.status || '',
             item.location || '',
-            item.allocatedBy || ''
+            item.allocatedBy || '',
+            item.notes || ''
         ]);
         filename = `Laporan_Data_Dan_Stok_KMP_${new Date().toISOString().split('T')[0]}`;
     } else if (page === 'rekap') {

@@ -5,15 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Aplikasi KMP</title>
     
+    <!-- External Libraries -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
     
+    <!-- Link to your stylesheet -->
     <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-gray-100 text-gray-800 flex">
 
+    <!-- Sidebar Navigation -->
     <aside id="sidebar" class="bg-gray-800 text-white p-4 flex flex-col fixed h-full">
         <div class="flex items-center justify-center mb-10">
              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mountain-snow"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/><path d="M4.14 15.08c2.62-1.57 5.24-1.43 7.86.42 2.74 1.94 5.49 2 8.23.19"/></svg>
@@ -66,7 +69,9 @@
         </div>
     </aside>
 
+    <!-- Main Content -->
     <main id="main-content" class="p-4 md:p-8 w-full">
+        <!-- Auth Info -->
         <div class="flex justify-between items-center mb-6">
             <h1 id="page-title" class="text-3xl font-bold text-gray-900">Dasbor</h1>
              <div id="userInfo" class="text-sm text-gray-600 bg-white p-2 rounded-lg shadow-sm">
@@ -74,6 +79,7 @@
             </div>
         </div>
 
+        <!-- Page: Dashboard -->
         <div id="dashboard" class="page">
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                 <div class="bg-white p-6 rounded-xl shadow-md flex items-center space-x-4">
@@ -153,6 +159,7 @@
             </div>
         </div>
 
+        <!-- Page: Data Entry -->
         <div id="data-entry" class="page hidden">
              <div class="max-w-xl mx-auto bg-white p-8 rounded-xl shadow-md">
                 <h2 class="text-2xl font-bold mb-6">Input Donasi Baru</h2>
@@ -195,7 +202,7 @@
                         <input type="number" id="discount" placeholder="Contoh: 100000" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm">
                     </div>
                     <div id="price-field">
-                        <label for="price" class="block text-sm font-medium text-gray-700">Harga (Rp)</label>
+                        <label for="price-display" class="block text-sm font-medium text-gray-700">Harga (Rp)</label>
                         <input type="text" id="price-display" placeholder="Harga akan terisi otomatis" class="mt-1 block w-full px-3 py-2 bg-gray-200 border-gray-300 rounded-md" readonly>
                     </div>
                     <div>
@@ -211,6 +218,7 @@
             </div>
         </div>
 
+        <!-- Page: Animal Stock -->
         <div id="stock" class="page hidden">
             <div class="bg-white p-6 rounded-xl shadow-md">
                 <div class="flex justify-between items-center mb-4">
@@ -232,8 +240,10 @@
                                 <th class="p-3">Donatur</th>
                                 <th class="p-3">Jenis</th>
                                 <th class="p-3">Tipe</th>
-                                <th class="p-3">Tanggal Masuk</th>
+                                <th class="p-3 text-right">Nilai (Rp)</th>
+                                <th class="p-3 text-right">Diskon (Rp)</th>
                                 <th class="p-3">Sumber</th>
+                                <th class="p-3">Catatan</th>
                                 <th class="p-3 text-center">Aksi</th>
                             </tr>
                         </thead>
@@ -252,9 +262,11 @@
                                 <th class="p-3">Donatur</th>
                                 <th class="p-3">Jenis</th>
                                 <th class="p-3">Tipe</th>
+                                <th class="p-3 text-right">Nilai (Rp)</th>
+                                <th class="p-3 text-right">Diskon (Rp)</th>
                                 <th class="p-3">Lokasi</th>
-                                <th class="p-3">Sumber</th>
                                 <th class="p-3">Dialokasikan oleh</th>
+                                <th class="p-3">Catatan</th>
                                 <th class="p-3 text-center">Aksi</th>
                             </tr>
                         </thead>
@@ -274,6 +286,7 @@
                                 <th class="p-3">Tanggal Masuk</th>
                                 <th class="p-3">Sumber</th>
                                 <th class="p-3 text-right">Nilai (Rp)</th>
+                                <th class="p-3">Catatan</th>
                                 <th class="p-3 text-center">Aksi</th>
                             </tr>
                         </thead>
@@ -283,6 +296,7 @@
             </div>
         </div>
 
+        <!-- Page: Allocation (Admin Only) -->
         <div id="allocation" class="page hidden">
             <div class="bg-white p-6 rounded-xl shadow-md">
                 <h2 class="text-xl font-bold mb-4">Alokasi Stok</h2>
@@ -331,6 +345,7 @@
             </div>
         </div>
         
+        <!-- Page: Recap -->
         <div id="rekap" class="page hidden">
             <div class="bg-white p-6 rounded-xl shadow-md">
                  <div class="flex justify-between items-center mb-4">
@@ -369,6 +384,7 @@
             </div>
         </div>
 
+        <!-- Page: Targets (Admin Only) -->
         <div id="targets" class="page hidden">
             <div class="max-w-2xl mx-auto bg-white p-8 rounded-xl shadow-md">
                 <h2 class="text-2xl font-bold mb-6">Atur Target Donasi</h2>
@@ -401,6 +417,7 @@
             </div>
         </div>
         
+        <!-- Page: User Management (Admin Only) -->
         <div id="user-management" class="page hidden">
             <div class="bg-white p-6 rounded-xl shadow-md">
                 <div class="flex justify-between items-center mb-4">
@@ -417,13 +434,15 @@
                             </tr>
                         </thead>
                         <tbody id="user-list-table">
-                            </tbody>
+                            <!-- User list will be populated by script.js -->
+                        </tbody>
                     </table>
                 </div>
             </div>
         </div>
     </main>
 
+    <!-- Login Modal -->
     <div id="loginModal" class="modal hidden">
         <div class="modal-content">
             <div class="mt-3 text-center">
@@ -447,6 +466,7 @@
         </div>
     </div>
 
+    <!-- Edit Modal -->
     <div id="editModal" class="modal hidden">
         <div class="modal-content">
             <h3 class="text-lg font-bold text-center mb-4">Ubah Donasi</h3>
@@ -468,6 +488,10 @@
                     <label for="edit-quantity" class="block text-sm font-medium text-gray-700">Jumlah</label>
                     <input type="number" id="edit-quantity" min="1" class="mt-1 block w-full px-3 py-2 bg-white border" required>
                 </div>
+                <div id="edit-discount-field" class="hidden">
+                    <label for="edit-discount" class="block text-sm font-medium text-gray-700">Diskon (Rp)</label>
+                    <input type="number" id="edit-discount" placeholder="Contoh: 100000" class="mt-1 block w-full px-3 py-2 bg-white border">
+                </div>
                  <div id="edit-price-field" class="hidden">
                     <label for="edit-price" class="block text-sm font-medium text-gray-700">Harga (Rp)</label>
                     <input type="number" id="edit-price" class="mt-1 block w-full px-3 py-2 bg-white border">
@@ -475,6 +499,10 @@
                 <div id="edit-location-field" class="hidden">
                     <label for="edit-location" class="block text-sm font-medium text-gray-700">Lokasi</label>
                     <input type="text" id="edit-location" class="mt-1 block w-full px-3 py-2 bg-white border">
+                </div>
+                <div id="edit-notes-field">
+                    <label for="edit-notes" class="block text-sm font-medium text-gray-700">Catatan</label>
+                    <textarea id="edit-notes" rows="3" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm"></textarea>
                 </div>
                 <div class="flex justify-center space-x-4 pt-4">
                     <button type="submit" class="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">Simpan Perubahan</button>
@@ -484,8 +512,10 @@
         </div>
     </div>
 
+    <!-- Confirm Delete Modal -->
     <div id="confirmDeleteModal" class="modal hidden"></div>
     
+    <!-- Toast Notification -->
     <div id="toast" class="hidden fixed bottom-5 right-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg">
         <p id="toast-message"></p>
     </div>

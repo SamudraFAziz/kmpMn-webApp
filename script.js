@@ -53,7 +53,7 @@ let allDonations = [];
 let targets = {};
 let allUsers = [];
 let unsubscribe = null;
-let currentRawPrice = 0; // To hold the unformatted total price for submission
+let currentRawPrice = 0;
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -93,8 +93,8 @@ function setupEventListeners() {
     document.getElementById('donation-form').addEventListener('submit', handleFormSubmit);
     document.getElementById('donation-type').addEventListener('change', handleDonationTypeChange);
     document.getElementById('donation-tier').addEventListener('change', updatePrice);
-    document.getElementById('quantity').addEventListener('input', updatePrice); // Recalculate on quantity change
-    document.getElementById('discount').addEventListener('input', updatePrice); // Recalculate on discount change
+    document.getElementById('quantity').addEventListener('input', updatePrice);
+    document.getElementById('discount').addEventListener('input', updatePrice);
     document.getElementById('edit-form').addEventListener('submit', handleEditSubmit);
     document.getElementById('closeEditBtn').addEventListener('click', () => closeModal('editModal'));
     document.getElementById('targets-form').addEventListener('submit', handleTargetFormSubmit);
@@ -319,7 +319,7 @@ window.updateUserRole = async (uid, newRole) => {
 // --- DATA ENTRY FORM LOGIC ---
 function updatePrice() {
     const type = document.getElementById('donation-type').value;
-    if (type === 'cash') return; // Do nothing for cash donations
+    if (type === 'cash') return;
 
     const tier = document.getElementById('donation-tier').value;
     const quantity = parseInt(document.getElementById('quantity').value, 10) || 1;
@@ -344,7 +344,6 @@ function handleDonationTypeChange() {
     const donationTierSelect = document.getElementById('donation-tier');
     const type = donationTypeSelect.value;
     
-    // Reset fields
     donationTierSelect.innerHTML = '';
     priceDisplayInput.value = '';
     document.getElementById('discount').value = '';
@@ -353,27 +352,33 @@ function handleDonationTypeChange() {
 
     const isCash = type === 'cash';
     
-    // Toggle visibility
     tierField.classList.toggle('hidden', isCash || !type);
     discountField.classList.toggle('hidden', isCash || !type);
     quantityField.classList.toggle('hidden', isCash);
     
-    // Handle price input state
     priceDisplayInput.readOnly = !isCash;
     priceDisplayInput.classList.toggle('bg-gray-200', !isCash);
     priceDisplayInput.classList.toggle('bg-white', isCash);
     priceDisplayInput.placeholder = isCash ? 'Masukkan jumlah donasi' : 'Harga akan terisi otomatis';
-
-    if (!isCash && prices[type]) {
-        Object.keys(prices[type]).forEach(tierName => {
-            const option = document.createElement('option');
-            option.value = tierName;
-            option.textContent = tierName;
-            donationTierSelect.appendChild(option);
-        });
+    
+    if (isCash) {
+        priceDisplayInput.oninput = (e) => {
+            let value = e.target.value.replace(/[^0-9]/g, '');
+            currentRawPrice = parseInt(value, 10) || 0;
+            e.target.value = currentRawPrice.toLocaleString('id-ID');
+        };
+    } else {
+        priceDisplayInput.oninput = null; // Remove listener for non-cash
+        if (prices[type]) {
+            Object.keys(prices[type]).forEach(tierName => {
+                const option = document.createElement('option');
+                option.value = tierName;
+                option.textContent = tierName;
+                donationTierSelect.appendChild(option);
+            });
+        }
     }
     
-    // Initial price calculation
     updatePrice();
 }
 
@@ -536,9 +541,9 @@ function clearAllDataUI() {
     document.getElementById('total-cows-qty').textContent = '0 bagian';
     document.getElementById('total-cash').textContent = 'Rp 0';
     document.getElementById('recent-donations-table').innerHTML = `<tr><td colspan="7" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
-    document.getElementById('stock-table').innerHTML = `<tr><td colspan="7" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
-    document.getElementById('allocated-stock-table').innerHTML = `<tr><td colspan="8" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
-    document.getElementById('cash-donations-table').innerHTML = `<tr><td colspan="6" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
+    document.getElementById('stock-table').innerHTML = `<tr><td colspan="9" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
+    document.getElementById('allocated-stock-table').innerHTML = `<tr><td colspan="10" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
+    document.getElementById('cash-donations-table').innerHTML = `<tr><td colspan="7" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
     document.getElementById('rekap-table').innerHTML = `<tr><td colspan="8" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
     document.getElementById('allocation-stock-list').innerHTML = '<p class="text-center p-4">Silakan masuk untuk melihat data.</p>';
 }
@@ -604,12 +609,14 @@ function renderStockPage(unallocated, allocated, cash) {
             <td class="p-3">${item.donorName}</td>
             <td class="p-3">${item.type.replace(/_/g, ' ')} (${item.quantity})</td>
             <td class="p-3">${item.tier}</td>
-            <td class="p-3">${new Date((item.createdAt?.seconds || 0) * 1000).toLocaleDateString()}</td>
+            <td class="p-3 text-right">${(item.totalValue || 0).toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right">${(item.discount || 0).toLocaleString('id-ID')}</td>
             <td class="p-3">${item.source}</td>
+            <td class="p-3">${item.notes || '-'}</td>
             ${actions}
         </tr>`;
     }).join('');
-    if (unallocated.length === 0) unallocatedBody.innerHTML = '<tr><td colspan="7" class="text-center p-4">Tidak ada stok.</td></tr>';
+    if (unallocated.length === 0) unallocatedBody.innerHTML = '<tr><td colspan="9" class="text-center p-4">Tidak ada stok.</td></tr>';
 
     const allocatedBody = document.getElementById('allocated-stock-table');
     allocatedBody.innerHTML = allocated.map(item => {
@@ -620,13 +627,15 @@ function renderStockPage(unallocated, allocated, cash) {
             <td class="p-3">${item.donorName}</td>
             <td class="p-3">${item.type.replace(/_/g, ' ')} (${item.quantity})</td>
             <td class="p-3">${item.tier}</td>
+            <td class="p-3 text-right">${(item.totalValue || 0).toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right">${(item.discount || 0).toLocaleString('id-ID')}</td>
             <td class="p-3">${item.location}</td>
-            <td class="p-3">${item.source}</td>
             <td class="p-3">${item.allocatedBy}</td>
+            <td class="p-3">${item.notes || '-'}</td>
             ${actions}
         </tr>`;
     }).join('');
-    if (allocated.length === 0) allocatedBody.innerHTML = '<tr><td colspan="8" class="text-center p-4">Belum ada stok yang dialokasikan.</td></tr>';
+    if (allocated.length === 0) allocatedBody.innerHTML = '<tr><td colspan="10" class="text-center p-4">Belum ada stok yang dialokasikan.</td></tr>';
 
     const cashBody = document.getElementById('cash-donations-table');
     cashBody.innerHTML = cash.map(item => {
@@ -638,10 +647,11 @@ function renderStockPage(unallocated, allocated, cash) {
             <td class="p-3">${new Date((item.createdAt?.seconds || 0) * 1000).toLocaleDateString()}</td>
             <td class="p-3">${item.source}</td>
             <td class="p-3 text-right">Rp ${item.totalValue.toLocaleString('id-ID')}</td>
+            <td class="p-3">${item.notes || '-'}</td>
             ${actions}
         </tr>`;
     }).join('');
-    if (cash.length === 0) cashBody.innerHTML = '<tr><td colspan="6" class="text-center p-4">Tidak ada donasi tunai.</td></tr>';
+    if (cash.length === 0) cashBody.innerHTML = '<tr><td colspan="7" class="text-center p-4">Tidak ada donasi tunai.</td></tr>';
 
     lucide.createIcons();
 }
@@ -804,6 +814,7 @@ window.openEditModal = async (docId) => {
         const data = docSnap.data();
         document.getElementById('edit-doc-id').value = docId;
         document.getElementById('edit-donor-name').value = data.donorName;
+        document.getElementById('edit-notes').value = data.notes || '';
         
         const sourceSelect = document.getElementById('edit-donation-source');
         sourceSelect.innerHTML = sources.map(s => `<option value="${s}" ${s === data.source ? 'selected' : ''}>${s}</option>`).join('');
@@ -811,6 +822,7 @@ window.openEditModal = async (docId) => {
         const isCash = data.type === 'cash';
         document.getElementById('edit-tier-field').style.display = isCash ? 'none' : 'block';
         document.getElementById('edit-quantity-field').style.display = isCash ? 'none' : 'block';
+        document.getElementById('edit-discount-field').style.display = isCash ? 'none' : 'block';
         document.getElementById('edit-price-field').style.display = isCash ? 'block' : 'none';
         document.getElementById('edit-location-field').style.display = data.status === 'allocated' ? 'block' : 'none';
 
@@ -820,6 +832,7 @@ window.openEditModal = async (docId) => {
             const tierSelect = document.getElementById('edit-donation-tier');
             tierSelect.innerHTML = Object.keys(prices[data.type]).map(t => `<option value="${t}" ${t === data.tier ? 'selected' : ''}>${t}</option>`).join('');
             document.getElementById('edit-quantity').value = data.quantity;
+            document.getElementById('edit-discount').value = data.discount || 0;
             if (data.location) {
                 document.getElementById('edit-location').value = data.location;
             }
@@ -835,12 +848,15 @@ async function handleEditSubmit(e) {
     e.preventDefault();
     const docId = document.getElementById('edit-doc-id').value;
     const docRef = doc(db, "donations", docId);
-    const originalDoc = await getDoc(docRef);
-    const originalData = originalDoc.data();
+    const originalDocSnap = await getDoc(docRef);
+    if (!originalDocSnap.exists()) return showToast("Dokumen tidak ditemukan!", "error");
+    
+    const originalData = originalDocSnap.data();
 
     const updatedData = {
         donorName: document.getElementById('edit-donor-name').value,
         source: document.getElementById('edit-donation-source').value,
+        notes: document.getElementById('edit-notes').value,
     };
 
     if (originalData.type === 'cash') {
@@ -850,12 +866,16 @@ async function handleEditSubmit(e) {
     } else {
         const newQuantity = parseInt(document.getElementById('edit-quantity').value, 10);
         const newTier = document.getElementById('edit-donation-tier').value;
-        const newPrice = prices[originalData.type][newTier];
+        const newDiscount = parseInt(document.getElementById('edit-discount').value, 10) || 0;
+        const basePrice = prices[originalData.type][newTier];
+        
+        const totalValue = (basePrice * newQuantity) - newDiscount;
 
         updatedData.quantity = newQuantity;
         updatedData.tier = newTier;
-        updatedData.price = newPrice;
-        updatedData.totalValue = newPrice * newQuantity;
+        updatedData.discount = newDiscount;
+        updatedData.price = newQuantity > 0 ? totalValue / newQuantity : 0;
+        updatedData.totalValue = totalValue;
         
         if (originalData.status === 'allocated') {
             updatedData.location = document.getElementById('edit-location').value;

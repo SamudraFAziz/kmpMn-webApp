@@ -368,7 +368,7 @@ function handleDonationTypeChange() {
             e.target.value = currentRawPrice.toLocaleString('id-ID');
         };
     } else {
-        priceDisplayInput.oninput = null;
+        priceDisplayInput.oninput = null; // Remove listener for non-cash
         if (prices[type]) {
             Object.keys(prices[type]).forEach(tierName => {
                 const option = document.createElement('option');
@@ -512,12 +512,11 @@ function filterAndRenderData() {
             totals[data.type].value += data.totalValue;
         }
         if (data.createdAt) {
-            // TIMEZONE FIX: Convert Firestore timestamp to local date string
-            const localDate = new Date(data.createdAt.seconds * 1000).toLocaleDateString('en-CA'); // 'en-CA' gives YYYY-MM-DD format
-            if (!rekapData[localDate]) rekapData[localDate] = { goat: {qty:0, value:0}, cow_whole: {qty:0, value:0}, cow_share: {qty:0, value:0}, cash: {qty:0, value:0} };
-            if (rekapData[localDate][data.type]) {
-                rekapData[localDate][data.type].qty += data.quantity;
-                rekapData[localDate][data.type].value += data.totalValue;
+            const date = new Date(data.createdAt.seconds * 1000).toISOString().split('T')[0];
+            if (!rekapData[date]) rekapData[date] = { goat: {qty:0, value:0}, cow_whole: {qty:0, value:0}, cow_share: {qty:0, value:0}, cash: {qty:0, value:0} };
+            if (rekapData[date][data.type]) {
+                rekapData[date][data.type].qty += data.quantity;
+                rekapData[date][data.type].value += data.totalValue;
             }
         }
     });
@@ -645,7 +644,7 @@ function renderStockPage(unallocated, allocated, cash) {
         <tr class="border-b hover:bg-gray-50">
             <td class="p-3 font-mono text-xs">${item.displayId}</td>
             <td class="p-3">${item.donorName}</td>
-            <td class="p-3">${new Date((item.createdAt?.seconds || 0) * 1000).toLocaleDateString('id-ID')}</td>
+            <td class="p-3">${new Date((item.createdAt?.seconds || 0) * 1000).toLocaleDateString()}</td>
             <td class="p-3">${item.source}</td>
             <td class="p-3 text-right">Rp ${item.totalValue.toLocaleString('id-ID')}</td>
             <td class="p-3">${item.notes || '-'}</td>
@@ -736,7 +735,7 @@ function exportData(page, format) {
             item.price || 0,
             item.discount || 0,
             item.totalValue || 0,
-            item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('id-ID') : '',
+            item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : '',
             item.source || '',
             item.status || '',
             item.location || '',
@@ -748,7 +747,7 @@ function exportData(page, format) {
         const rekapData = {};
         allDonations.forEach(data => {
             if (data.createdAt) {
-                const date = new Date(data.createdAt.seconds * 1000).toLocaleDateString('en-CA');
+                const date = new Date(data.createdAt.seconds * 1000).toISOString().split('T')[0];
                 if (!rekapData[date]) rekapData[date] = { goat_qty:0, goat_val:0, cow_whole_qty:0, cow_whole_val:0, cow_share_qty:0, cow_share_val:0, cash_val:0 };
                 if (data.type === 'goat') { rekapData[date].goat_qty += data.quantity; rekapData[date].goat_val += data.totalValue; }
                 if (data.type === 'cow_whole') { rekapData[date].cow_whole_qty += data.quantity; rekapData[date].cow_whole_val += data.totalValue; }

@@ -27,7 +27,7 @@ const firebaseConfig = {
     apiKey: "AIzaSyBBynuU7RUKJqAGrb3D9zU5AyOU9iJbQvY",
     authDomain: "kmpdataapp.firebaseapp.com",
     projectId: "kmpdataapp",
-    storageBucket: "kmpdataapp.firebasestorage.app",
+    storageBucket: "kmpdataapp.appspot.com",
     messagingSenderId: "1079100933572",
     appId: "1:1079100933572:web:94c778728645a70de35091",
     measurementId: "G-CD5NWYDNNM"
@@ -356,7 +356,7 @@ function handleDonationTypeChange() {
     discountField.classList.toggle('hidden', isCash || !type);
     quantityField.classList.toggle('hidden', isCash);
     
-    priceDisplayInput.readOnly = !isCash;
+    priceDisplayInput.readOnly = isCash;
     priceDisplayInput.classList.toggle('bg-gray-200', !isCash);
     priceDisplayInput.classList.toggle('bg-white', isCash);
     priceDisplayInput.placeholder = isCash ? 'Masukkan jumlah donasi' : 'Harga akan terisi otomatis';
@@ -540,9 +540,9 @@ function clearAllDataUI() {
     document.getElementById('total-cows-value').textContent = 'Rp 0';
     document.getElementById('total-cows-qty').textContent = '0 bagian';
     document.getElementById('total-cash').textContent = 'Rp 0';
-    document.getElementById('recent-donations-table').innerHTML = `<tr><td colspan="7" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
-    document.getElementById('stock-table').innerHTML = `<tr><td colspan="9" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
-    document.getElementById('allocated-stock-table').innerHTML = `<tr><td colspan="10" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
+    document.getElementById('recent-donations-table').innerHTML = `<tr><td colspan="9" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
+    document.getElementById('stock-table').innerHTML = `<tr><td colspan="10" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
+    document.getElementById('allocated-stock-table').innerHTML = `<tr><td colspan="12" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
     document.getElementById('cash-donations-table').innerHTML = `<tr><td colspan="7" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
     document.getElementById('rekap-table').innerHTML = `<tr><td colspan="8" class="text-center p-4">Silakan masuk untuk melihat data.</td></tr>`;
     document.getElementById('allocation-stock-list').innerHTML = '<p class="text-center p-4">Silakan masuk untuk melihat data.</p>';
@@ -583,7 +583,7 @@ function renderDashboard(totals) {
 function renderRecentDonations(donations) {
     const tableBody = document.getElementById('recent-donations-table');
     donations.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-    tableBody.innerHTML = donations.slice(0, 10).map(don => {
+    const content = donations.slice(0, 10).map(don => {
         const actions = userRole === 'admin' ? `<td class="p-3 text-center"><button onclick="openEditModal('${don.id}')" class="action-btn" title="Ubah"><i data-lucide="edit"></i></button><button onclick="openDeleteModal('${don.id}')" class="action-btn text-red-500 hover:text-red-700" title="Hapus"><i data-lucide="trash-2"></i></button></td>` : '<td></td>';
         return `
             <tr class="border-b hover:bg-gray-50">
@@ -592,10 +592,14 @@ function renderRecentDonations(donations) {
                 <td class="p-3">${don.tier ? `${don.type.replace(/_/g, ' ')} (${don.tier})` : don.type.replace(/_/g, ' ')}</td>
                 <td class="p-3 text-center">${don.quantity}</td>
                 <td class="p-3 text-right">Rp ${don.totalValue.toLocaleString('id-ID')}</td>
+                <td class="p-3">${don.createdAt ? new Date(don.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
                 <td class="p-3">${don.source}</td>
+                <td class="p-3">${don.notes || '-'}</td>
                 ${actions}
             </tr>`;
     }).join('');
+    
+    tableBody.innerHTML = content || `<tr><td colspan="9" class="text-center p-4">Tidak ada donasi.</td></tr>`;
     lucide.createIcons();
 }
 
@@ -609,14 +613,15 @@ function renderStockPage(unallocated, allocated, cash) {
             <td class="p-3">${item.donorName}</td>
             <td class="p-3">${item.type.replace(/_/g, ' ')} (${item.quantity})</td>
             <td class="p-3">${item.tier}</td>
-            <td class="p-3 text-right">${(item.totalValue || 0).toLocaleString('id-ID')}</td>
-            <td class="p-3 text-right">${(item.discount || 0).toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right">Rp ${(item.totalValue || 0).toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right">Rp ${(item.discount || 0).toLocaleString('id-ID')}</td>
+            <td class="p-3">${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
             <td class="p-3">${item.source}</td>
             <td class="p-3">${item.notes || '-'}</td>
             ${actions}
         </tr>`;
     }).join('');
-    if (unallocated.length === 0) unallocatedBody.innerHTML = '<tr><td colspan="9" class="text-center p-4">Tidak ada stok.</td></tr>';
+    if (unallocated.length === 0) unallocatedBody.innerHTML = '<tr><td colspan="10" class="text-center p-4">Tidak ada stok.</td></tr>';
 
     const allocatedBody = document.getElementById('allocated-stock-table');
     allocatedBody.innerHTML = allocated.map(item => {
@@ -627,15 +632,17 @@ function renderStockPage(unallocated, allocated, cash) {
             <td class="p-3">${item.donorName}</td>
             <td class="p-3">${item.type.replace(/_/g, ' ')} (${item.quantity})</td>
             <td class="p-3">${item.tier}</td>
-            <td class="p-3 text-right">${(item.totalValue || 0).toLocaleString('id-ID')}</td>
-            <td class="p-3 text-right">${(item.discount || 0).toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right">Rp ${(item.totalValue || 0).toLocaleString('id-ID')}</td>
+            <td class="p-3 text-right">Rp ${(item.discount || 0).toLocaleString('id-ID')}</td>
+            <td class="p-3">${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
+            <td class="p-3">${item.source}</td>
             <td class="p-3">${item.location}</td>
             <td class="p-3">${item.allocatedBy}</td>
             <td class="p-3">${item.notes || '-'}</td>
             ${actions}
         </tr>`;
     }).join('');
-    if (allocated.length === 0) allocatedBody.innerHTML = '<tr><td colspan="10" class="text-center p-4">Belum ada stok yang dialokasikan.</td></tr>';
+    if (allocated.length === 0) allocatedBody.innerHTML = '<tr><td colspan="12" class="text-center p-4">Belum ada stok yang dialokasikan.</td></tr>';
 
     const cashBody = document.getElementById('cash-donations-table');
     cashBody.innerHTML = cash.map(item => {
@@ -644,7 +651,7 @@ function renderStockPage(unallocated, allocated, cash) {
         <tr class="border-b hover:bg-gray-50">
             <td class="p-3 font-mono text-xs">${item.displayId}</td>
             <td class="p-3">${item.donorName}</td>
-            <td class="p-3">${new Date((item.createdAt?.seconds || 0) * 1000).toLocaleDateString()}</td>
+            <td class="p-3">${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
             <td class="p-3">${item.source}</td>
             <td class="p-3 text-right">Rp ${item.totalValue.toLocaleString('id-ID')}</td>
             <td class="p-3">${item.notes || '-'}</td>
@@ -735,7 +742,7 @@ function exportData(page, format) {
             item.price || 0,
             item.discount || 0,
             item.totalValue || 0,
-            item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString() : '',
+            item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('id-ID') : '',
             item.source || '',
             item.status || '',
             item.location || '',

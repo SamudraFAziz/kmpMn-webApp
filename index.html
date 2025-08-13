@@ -17,13 +17,13 @@
 <body class="bg-gray-100 text-gray-800 flex">
 
     <!-- Sidebar Navigation -->
-    <aside id="sidebar" class="bg-gray-800 text-white p-4 flex flex-col fixed h-full">
+    <aside id="sidebar" class="bg-gray-800 text-white p-4 flex flex-col fixed h-full z-40">
         <div class="flex items-center justify-center mb-10">
              <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mountain-snow"><path d="m8 3 4 8 5-5 5 15H2L8 3z"/><path d="M4.14 15.08c2.62-1.57 5.24-1.43 7.86.42 2.74 1.94 5.49 2 8.23.19"/></svg>
              <span class="sidebar-text ml-2 text-lg font-bold">KMP App</span>
         </div>
         <nav class="flex flex-col space-y-2">
-            <a href="#" class="sidebar-icon" data-page="dashboard" title="Dasbor">
+            <a href="#" class="sidebar-icon active" data-page="dashboard" title="Dasbor">
                 <i data-lucide="layout-dashboard"></i>
                 <span class="sidebar-text">Dasbor</span>
             </a>
@@ -144,12 +144,14 @@
                     <table class="w-full text-left table-auto">
                         <thead>
                             <tr class="bg-gray-50 border-b">
-                                <th class="p-3 w-1/5">ID Donasi</th>
-                                <th class="p-3 w-1/5">Donatur</th>
-                                <th class="p-3 w-1/5">Jenis</th>
-                                <th class="p-3 w-1/12 text-center">Jumlah</th>
-                                <th class="p-3 w-1/4 text-right">Nilai (Rp)</th>
+                                <th class="p-3">ID Donasi</th>
+                                <th class="p-3">Donatur</th>
+                                <th class="p-3">Jenis</th>
+                                <th class="p-3 text-center">Jumlah</th>
+                                <th class="p-3 text-right">Nilai (Rp)</th>
+                                <th class="p-3">Tanggal Masuk</th>
                                 <th class="p-3">Sumber</th>
+                                <th class="p-3">Catatan</th>
                                 <th class="p-3 text-center">Aksi</th>
                             </tr>
                         </thead>

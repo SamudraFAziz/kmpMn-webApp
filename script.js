@@ -21,6 +21,7 @@ import {
     serverTimestamp,
     setDoc
 } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-firestore.js";
+import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.10.0/firebase-functions.js";
 
 // --- FIREBASE CONFIGURATION ---
 const firebaseConfig = {
@@ -45,6 +46,7 @@ const sources = ['Masjid Nusantara', 'Kitabisa', 'Amal Sholeh', 'Sharing Happine
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const functions = getFunctions(app);
 
 // --- GLOBAL STATE ---
 let currentUser = null;
@@ -53,7 +55,9 @@ let allDonations = [];
 let targets = {};
 let allUsers = [];
 let unsubscribe = null;
-let currentRawPrice = 0;
+let isPriceOverridden = false;
+let manualPriceBeforeDiscount = 0;
+
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
@@ -62,6 +66,16 @@ document.addEventListener('DOMContentLoaded', () => {
     showPage('dashboard');
     lucide.createIcons();
 });
+
+// --- HELPER FUNCTION FOR FORMATTING ---
+function formatNumberInput(e) {
+    let value = e.target.value.replace(/[^0-9]/g, '');
+    if (value) {
+        e.target.value = parseInt(value, 10).toLocaleString('id-ID');
+    } else {
+        e.target.value = '';
+    }
+}
 
 function setupEventListeners() {
     // Sidebar
@@ -91,10 +105,32 @@ function setupEventListeners() {
     
     // Forms
     document.getElementById('donation-form').addEventListener('submit', handleFormSubmit);
-    document.getElementById('donation-type').addEventListener('change', handleDonationTypeChange);
-    document.getElementById('donation-tier').addEventListener('change', updatePrice);
-    document.getElementById('quantity').addEventListener('input', updatePrice);
-    document.getElementById('discount').addEventListener('input', updatePrice);
+    
+    document.getElementById('donation-type').addEventListener('change', () => {
+        isPriceOverridden = false;
+        handleDonationTypeChange();
+    });
+    document.getElementById('donation-tier').addEventListener('change', () => {
+        isPriceOverridden = false;
+        calculatePrice();
+    });
+    document.getElementById('quantity').addEventListener('input', () => {
+        isPriceOverridden = false;
+        calculatePrice();
+    });
+    
+    document.getElementById('discount').addEventListener('input', (e) => {
+        formatNumberInput(e);
+        calculatePrice(); 
+    });
+    
+    document.getElementById('price-display').addEventListener('input', (e) => {
+        isPriceOverridden = true;
+        formatNumberInput(e);
+        const rawValue = e.target.value.replace(/[^0-9]/g, '');
+        manualPriceBeforeDiscount = parseInt(rawValue, 10) || 0;
+    });
+
     document.getElementById('edit-form').addEventListener('submit', handleEditSubmit);
     document.getElementById('closeEditBtn').addEventListener('click', () => closeModal('editModal'));
     document.getElementById('targets-form').addEventListener('submit', handleTargetFormSubmit);
@@ -146,26 +182,43 @@ function showPage(pageId) {
     document.getElementById('page-title').textContent = titles[pageId] || 'Dasbor';
 }
 
-// --- AUTHENTICATION ---
+// --- AUTHENTICATION (WITH APPROVAL FLOW) ---
 async function handleLogin() {
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     if (!email || !password) return showToast("Silakan masukkan email dan kata sandi.", "error");
+
     try {
+        // Try to sign in first
         await signInWithEmailAndPassword(auth, email, password);
+        // onAuthStateChanged will handle the rest (checking status, etc.)
         closeModal('loginModal');
-        showToast("Berhasil masuk!", "success");
     } catch (error) {
         if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+            // If user doesn't exist, this is a registration attempt
             try {
-                await createUserWithEmailAndPassword(auth, email, password);
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                // Immediately create a 'pending' user profile in Firestore
+                await setDoc(doc(db, "users", user.uid), {
+                    email: user.email,
+                    role: 'guest', // Default role until approved
+                    status: 'pending', // Default status
+                    createdAt: serverTimestamp()
+                });
+
+                // Sign the user out immediately after registration
+                await signOut(auth);
+
                 closeModal('loginModal');
-                showToast("Pengguna baru dibuat dan berhasil masuk.", "success");
+                showToast("Pendaftaran berhasil. Akun Anda menunggu persetujuan admin.", "success");
+
             } catch (createError) {
-                showToast(`Gagal membuat pengguna: ${createError.message}`, "error");
+                showToast(`Gagal mendaftar: ${createError.message}`, "error");
             }
         } else {
-             showToast(`Gagal masuk: ${error.message}`, "error");
+            showToast(`Gagal masuk: ${error.message}`, "error");
         }
     }
 }
@@ -175,35 +228,64 @@ onAuthStateChanged(auth, async (user) => {
     const logoutBtn = document.getElementById('logoutBtn');
 
     if (user) {
-        loginBtn.classList.add('hidden');
-        logoutBtn.classList.remove('hidden');
-        
         const userDocRef = doc(db, "users", user.uid);
         const userDocSnap = await getDoc(userDocRef);
 
         if (userDocSnap.exists()) {
-            userRole = userDocSnap.data().role;
+            const userData = userDocSnap.data();
+            
+            // Check user status
+            if (userData.status === 'pending') {
+                showToast("Akun Anda masih menunggu persetujuan.", "error");
+                signOut(auth);
+                return; // Stop execution
+            }
+            
+            if (userData.status === 'rejected') {
+                showToast("Pendaftaran Anda telah ditolak.", "error");
+                signOut(auth);
+                return; // Stop execution
+            }
+
+            // If status is 'approved', let them in
+            userRole = userData.role;
+            currentUser = user;
+            loginBtn.classList.add('hidden');
+            logoutBtn.classList.remove('hidden');
+            document.getElementById('userInfo').innerHTML = `Masuk sebagai: <strong>${user.email}</strong> <br> Peran: <span class="font-bold text-indigo-600">${userRole.toUpperCase()}</span>`;
+            attachFirestoreListener();
+
         } else {
-            const newRole = user.email === 'admin@kmp.com' ? 'admin' : 'staff';
-            try {
-                await setDoc(userDocRef, {
-                    email: user.email,
-                    role: newRole,
-                    createdAt: serverTimestamp()
-                });
-                userRole = newRole;
-            } catch (error) {
-                console.error("Error creating user profile:", error);
-                showToast("Gagal membuat profil pengguna.", "error");
-                userRole = 'guest';
+            // THIS BLOCK IS NOW SAFER
+            // It only auto-creates a profile for the FIRST admin.
+            // Any other user without a profile is an anomaly and will be logged out.
+            if (user.email === 'admin@kmp.com') {
+                try {
+                    await setDoc(userDocRef, {
+                        email: user.email,
+                        role: 'admin',
+                        status: 'approved', // Auto-approve the first admin
+                        createdAt: serverTimestamp()
+                    });
+                    userRole = 'admin';
+                    currentUser = user;
+                    loginBtn.classList.add('hidden');
+                    logoutBtn.classList.remove('hidden');
+                    document.getElementById('userInfo').innerHTML = `Masuk sebagai: <strong>${user.email}</strong> <br> Peran: <span class="font-bold text-indigo-600">${userRole.toUpperCase()}</span>`;
+                    attachFirestoreListener();
+                } catch (error) {
+                    console.error("Error creating initial admin profile:", error);
+                    showToast("Gagal membuat profil admin.", "error");
+                    signOut(auth);
+                }
+            } else {
+                // If any other user has an auth account but no profile, it's an error.
+                showToast("Profil pengguna tidak ditemukan. Silakan hubungi admin.", "error");
+                signOut(auth);
             }
         }
-        
-        currentUser = user;
-        document.getElementById('userInfo').innerHTML = `Masuk sebagai: <strong>${user.email}</strong> <br> Peran: <span class="font-bold text-indigo-600">${userRole.toUpperCase()}</span>`;
-        attachFirestoreListener();
-
     } else {
+        // User is signed out
         currentUser = null;
         userRole = 'guest';
         loginBtn.classList.remove('hidden');
@@ -279,24 +361,78 @@ function renderUserManagementPage() {
     if (!tableBody) return;
 
     tableBody.innerHTML = allUsers.map(user => {
-        const isCurrentUser = user.uid === currentUser.uid;
-        const disabled = isCurrentUser ? 'disabled' : '';
+        const isCurrentUser = currentUser && user.uid === currentUser.uid;
         const note = isCurrentUser ? '<span class="text-xs text-gray-500 ml-2">(Anda)</span>' : '';
+        
+        let statusBadge = '';
+        if (user.status === 'approved') {
+            statusBadge = `<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-200 rounded-full">Disetujui</span>`;
+        } else if (user.status === 'pending') {
+            statusBadge = `<span class="px-2 py-1 text-xs font-semibold text-yellow-800 bg-yellow-200 rounded-full">Menunggu</span>`;
+        } else if (user.status === 'rejected') {
+            statusBadge = `<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-200 rounded-full">Ditolak</span>`;
+        }
+
+        let actions = '';
+        if (isCurrentUser) {
+            actions = 'Tidak ada aksi';
+        } else if (user.status === 'pending') {
+            actions = `
+                <button onclick="approveUser('${user.uid}')" class="px-2 py-1 text-xs text-white bg-green-500 hover:bg-green-600 rounded">Setujui</button>
+                <button onclick="rejectUser('${user.uid}')" class="px-2 py-1 text-xs text-white bg-red-500 hover:bg-red-600 rounded ml-1">Tolak</button>
+            `;
+        } else { // Approved or Rejected
+            actions = `
+                <div class="flex items-center justify-center">
+                    <select onchange="updateUserRole('${user.uid}', this.value)" class="p-2 border rounded-md bg-white text-sm">
+                        <option value="staff" ${user.role === 'staff' ? 'selected' : ''}>Staff</option>
+                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
+                    </select>
+                    <button onclick="openDeleteUserModal('${user.uid}', '${user.email}')" class="ml-2 p-2 text-red-500 hover:text-red-700" title="Hapus Pengguna"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                </div>
+            `;
+        }
 
         return `
             <tr class="border-b hover:bg-gray-50">
                 <td class="p-3">${user.email} ${note}</td>
                 <td class="p-3 font-semibold">${user.role.toUpperCase()}</td>
-                <td class="p-3">
-                    <select onchange="updateUserRole('${user.uid}', this.value)" ${disabled} class="p-2 border rounded-md bg-white">
-                        <option value="staff" ${user.role === 'staff' ? 'selected' : ''}>Staff</option>
-                        <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Admin</option>
-                    </select>
-                </td>
+                <td class="p-3">${statusBadge}</td>
+                <td class="p-3 text-center">${actions}</td>
             </tr>
         `;
     }).join('');
+    lucide.createIcons();
 }
+
+window.approveUser = async (uid) => {
+    if (userRole !== 'admin') return showToast("Hanya admin yang bisa melakukan aksi ini.", "error");
+    const userDocRef = doc(db, "users", uid);
+    try {
+        await updateDoc(userDocRef, { 
+            status: 'approved',
+            role: 'staff' // Default role upon approval
+        });
+        showToast("Pengguna berhasil disetujui.", "success");
+        fetchUsers(); 
+    } catch (error) {
+        console.error("Error approving user:", error);
+        showToast("Gagal menyetujui pengguna.", "error");
+    }
+};
+
+window.rejectUser = async (uid) => {
+    if (userRole !== 'admin') return showToast("Hanya admin yang bisa melakukan aksi ini.", "error");
+    const userDocRef = doc(db, "users", uid);
+    try {
+        await updateDoc(userDocRef, { status: 'rejected' });
+        showToast("Pengguna berhasil ditolak.", "success");
+        fetchUsers();
+    } catch (error) {
+        console.error("Error rejecting user:", error);
+        showToast("Gagal menolak pengguna.", "error");
+    }
+};
 
 window.updateUserRole = async (uid, newRole) => {
     if (userRole !== 'admin') return showToast("Hanya admin yang bisa mengubah peran.", "error");
@@ -315,25 +451,76 @@ window.updateUserRole = async (uid, newRole) => {
     }
 };
 
+window.openDeleteUserModal = (uid, email) => {
+    if (userRole !== 'admin') return;
+    const modalContainer = document.getElementById('confirmDeleteModal');
+    modalContainer.innerHTML = `
+        <div class="modal-content">
+            <h3 class="text-lg font-bold text-center">Konfirmasi Hapus Pengguna</h3>
+            <p class="text-center my-4">Apakah Anda yakin ingin menghapus pengguna <strong class="break-all">${email}</strong>? Tindakan ini akan menghapus akun login dan semua data terkait secara permanen.</p>
+            <div class="flex justify-center space-x-4">
+                <button id="confirm-delete-user-btn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">Ya, Hapus</button>
+                <button type="button" onclick="closeModal('confirmDeleteModal')" class="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-2 px-4 rounded">Batal</button>
+            </div>
+        </div>`;
+    
+    document.getElementById('confirm-delete-user-btn').onclick = () => deleteUser(uid);
+    openModal('confirmDeleteModal');
+};
+
+async function deleteUser(uid) {
+    if (userRole !== 'admin') {
+        showToast("Hanya admin yang bisa menghapus pengguna.", "error");
+        return;
+    }
+    
+    const deleteUserFunction = httpsCallable(functions, 'deleteUser');
+    try {
+        const result = await deleteUserFunction({ uid: uid });
+        if (result.data.success) {
+            showToast("Pengguna berhasil dihapus sepenuhnya.", "success");
+        } else {
+            throw new Error(result.data.error || "Gagal menghapus pengguna.");
+        }
+    } catch (error) {
+        console.error("Error calling deleteUser function:", error);
+        showToast(`Gagal menghapus pengguna: ${error.message}`, "error");
+    } finally {
+        closeModal('confirmDeleteModal');
+        fetchUsers(); // Refresh the user list
+    }
+}
+
 
 // --- DATA ENTRY FORM LOGIC ---
-function updatePrice() {
+// NEW: Smarter price calculation function
+function calculatePrice() {
     const type = document.getElementById('donation-type').value;
-    if (type === 'cash') return;
-
     const tier = document.getElementById('donation-tier').value;
     const quantity = parseInt(document.getElementById('quantity').value, 10) || 1;
-    const discount = parseInt(document.getElementById('discount').value, 10) || 0;
+    const discountRaw = document.getElementById('discount').value.replace(/[^0-9]/g, '');
+    const discount = parseInt(discountRaw, 10) || 0;
     const priceDisplayInput = document.getElementById('price-display');
 
-    const basePrice = (prices[type] && prices[type][tier]) ? prices[type][tier] : 0;
+    let finalPrice = 0;
+
+    if (isPriceOverridden) {
+        // If the price was manually set, calculate from that manual value
+        finalPrice = manualPriceBeforeDiscount - discount;
+    } else {
+        // Otherwise, calculate automatically from the price list
+        if (type === 'cash' || !type) {
+            finalPrice = 0;
+        } else {
+            const basePrice = (prices[type] && prices[type][tier]) ? prices[type][tier] : 0;
+            const totalBeforeDiscount = basePrice * quantity;
+            finalPrice = totalBeforeDiscount - discount;
+        }
+    }
     
-    const totalBeforeDiscount = basePrice * quantity;
-    const finalPrice = totalBeforeDiscount - discount;
-    
-    currentRawPrice = finalPrice < 0 ? 0 : finalPrice;
-    priceDisplayInput.value = currentRawPrice.toLocaleString('id-ID');
+    priceDisplayInput.value = (finalPrice < 0 ? 0 : finalPrice).toLocaleString('id-ID');
 }
+
 
 function handleDonationTypeChange() {
     const donationTypeSelect = document.getElementById('donation-type');
@@ -348,7 +535,6 @@ function handleDonationTypeChange() {
     priceDisplayInput.value = '';
     document.getElementById('discount').value = '';
     document.getElementById('quantity').value = '1';
-    currentRawPrice = 0;
 
     const isCash = type === 'cash';
     
@@ -356,30 +542,18 @@ function handleDonationTypeChange() {
     discountField.classList.toggle('hidden', isCash || !type);
     quantityField.classList.toggle('hidden', isCash);
     
-    priceDisplayInput.readOnly = isCash;
-    priceDisplayInput.classList.toggle('bg-gray-200', !isCash);
-    priceDisplayInput.classList.toggle('bg-white', isCash);
-    priceDisplayInput.placeholder = isCash ? 'Masukkan jumlah donasi' : 'Harga akan terisi otomatis';
+    priceDisplayInput.placeholder = 'Masukkan jumlah donasi';
     
-    if (isCash) {
-        priceDisplayInput.oninput = (e) => {
-            let value = e.target.value.replace(/[^0-9]/g, '');
-            currentRawPrice = parseInt(value, 10) || 0;
-            e.target.value = currentRawPrice.toLocaleString('id-ID');
-        };
-    } else {
-        priceDisplayInput.oninput = null; // Remove listener for non-cash
-        if (prices[type]) {
-            Object.keys(prices[type]).forEach(tierName => {
-                const option = document.createElement('option');
-                option.value = tierName;
-                option.textContent = tierName;
-                donationTierSelect.appendChild(option);
-            });
-        }
+    if (!isCash && prices[type]) {
+        Object.keys(prices[type]).forEach(tierName => {
+            const option = document.createElement('option');
+            option.value = tierName;
+            option.textContent = tierName;
+            donationTierSelect.appendChild(option);
+        });
     }
     
-    updatePrice();
+    calculatePrice();
 }
 
 // --- FORM SUBMISSION ---
@@ -389,22 +563,21 @@ async function handleFormSubmit(e) {
 
     const type = document.getElementById('donation-type').value;
     const notes = document.getElementById('notes').value;
-    let totalValue, pricePerUnit, quantity, discount, tier;
+    
+    const totalValueRaw = document.getElementById('price-display').value.replace(/[^0-9]/g, '');
+    const discountRaw = document.getElementById('discount').value.replace(/[^0-9]/g, '');
+    
+    let totalValue = parseInt(totalValueRaw, 10) || 0;
+    let discount = parseInt(discountRaw, 10) || 0;
+    let quantity = parseInt(document.getElementById('quantity').value, 10) || 1;
+    let tier = document.getElementById('donation-tier').value;
+    let pricePerUnit = quantity > 0 ? totalValue / quantity : 0;
 
     if (type === 'cash') {
-        totalValue = parseInt(document.getElementById('price-display').value.replace(/[^0-9]/g, ''), 10) || 0;
-        pricePerUnit = totalValue;
         quantity = 1;
         discount = 0;
         tier = null;
-    } else {
-        quantity = parseInt(document.getElementById('quantity').value, 10) || 1;
-        discount = parseInt(document.getElementById('discount').value, 10) || 0;
-        tier = document.getElementById('donation-tier').value;
-        const basePrice = (prices[type] && prices[type][tier]) ? prices[type][tier] : 0;
-        
-        totalValue = (basePrice * quantity) - discount;
-        pricePerUnit = quantity > 0 ? totalValue / quantity : 0;
+        pricePerUnit = totalValue;
     }
 
     if (!type || totalValue < 0) return showToast("Data tidak lengkap atau harga tidak valid.", "error");
@@ -431,6 +604,8 @@ async function handleFormSubmit(e) {
 
         showToast("Donasi berhasil ditambahkan!", "success");
         document.getElementById('donation-form').reset();
+        isPriceOverridden = false; // Reset flag after submission
+        manualPriceBeforeDiscount = 0;
         handleDonationTypeChange();
         showPage('dashboard');
     } catch (error) {
@@ -956,5 +1131,5 @@ function showToast(message, type = 'success') {
     toast.classList.remove('hidden');
     toast.classList.add(type === 'success' ? 'bg-green-500' : 'bg-red-500');
     toastMessage.textContent = message;
-    setTimeout(() => { toast.classList.add('hidden'); }, 3000);
+    setTimeout(() => { toast.classList.add('hidden'); }, 3000)
 }

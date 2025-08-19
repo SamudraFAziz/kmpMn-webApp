@@ -493,7 +493,6 @@ async function deleteUser(uid) {
 
 
 // --- DATA ENTRY FORM LOGIC ---
-// NEW: Smarter price calculation function
 function calculatePrice() {
     const type = document.getElementById('donation-type').value;
     const tier = document.getElementById('donation-tier').value;
@@ -505,10 +504,8 @@ function calculatePrice() {
     let finalPrice = 0;
 
     if (isPriceOverridden) {
-        // If the price was manually set, calculate from that manual value
         finalPrice = manualPriceBeforeDiscount - discount;
     } else {
-        // Otherwise, calculate automatically from the price list
         if (type === 'cash' || !type) {
             finalPrice = 0;
         } else {
@@ -660,6 +657,8 @@ function attachFirestoreListener() {
 
     unsubscribe = onSnapshot(query(collection(db, 'donations')), (snapshot) => {
         allDonations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        // SORTING IS NOW DONE HERE
+        allDonations.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
         filterAndRenderData();
     });
 }
@@ -701,7 +700,7 @@ function filterAndRenderData() {
     const cashDonations = filteredDonations.filter(d => d.type === 'cash');
 
     renderDashboard(totals);
-    renderRecentDonations(allDonations);
+    renderRecentDonations(filteredDonations); // Pass filtered data for dashboard recents
     renderStockPage(unallocatedStock, allocatedStock, cashDonations);
     renderAllocationPage(unallocatedStock, allocatedStock);
     renderRekapPage(rekapData);
@@ -757,17 +756,16 @@ function renderDashboard(totals) {
 
 function renderRecentDonations(donations) {
     const tableBody = document.getElementById('recent-donations-table');
-    donations.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
     const content = donations.slice(0, 10).map(don => {
         const actions = userRole === 'admin' ? `<td class="p-3 text-center"><button onclick="openEditModal('${don.id}')" class="action-btn" title="Ubah"><i data-lucide="edit"></i></button><button onclick="openDeleteModal('${don.id}')" class="action-btn text-red-500 hover:text-red-700" title="Hapus"><i data-lucide="trash-2"></i></button></td>` : '<td></td>';
         return `
             <tr class="border-b hover:bg-gray-50">
+                <td class="p-3">${don.createdAt ? new Date(don.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
                 <td class="p-3 font-mono text-xs">${don.displayId || 'N/A'}</td>
                 <td class="p-3">${don.donorName}</td>
                 <td class="p-3">${don.tier ? `${don.type.replace(/_/g, ' ')} (${don.tier})` : don.type.replace(/_/g, ' ')}</td>
                 <td class="p-3 text-center">${don.quantity}</td>
                 <td class="p-3 text-right">Rp ${don.totalValue.toLocaleString('id-ID')}</td>
-                <td class="p-3">${don.createdAt ? new Date(don.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
                 <td class="p-3">${don.source}</td>
                 <td class="p-3">${don.notes || '-'}</td>
                 ${actions}
@@ -784,13 +782,13 @@ function renderStockPage(unallocated, allocated, cash) {
         const actions = userRole === 'admin' ? `<td class="p-3 text-center"><button onclick="openEditModal('${item.id}')" class="action-btn" title="Ubah"><i data-lucide="edit"></i></button><button onclick="openDeleteModal('${item.id}')" class="action-btn text-red-500 hover:text-red-700" title="Hapus"><i data-lucide="trash-2"></i></button></td>` : '<td></td>';
         return `
         <tr class="border-b hover:bg-gray-50">
+            <td class="p-3">${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
             <td class="p-3 font-mono text-xs">${item.displayId}</td>
             <td class="p-3">${item.donorName}</td>
             <td class="p-3">${item.type.replace(/_/g, ' ')} (${item.quantity})</td>
             <td class="p-3">${item.tier}</td>
             <td class="p-3 text-right">Rp ${(item.totalValue || 0).toLocaleString('id-ID')}</td>
             <td class="p-3 text-right">Rp ${(item.discount || 0).toLocaleString('id-ID')}</td>
-            <td class="p-3">${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
             <td class="p-3">${item.source}</td>
             <td class="p-3">${item.notes || '-'}</td>
             ${actions}
@@ -803,13 +801,13 @@ function renderStockPage(unallocated, allocated, cash) {
         const actions = userRole === 'admin' ? `<td class="p-3 text-center"><button onclick="openEditModal('${item.id}')" class="action-btn" title="Ubah"><i data-lucide="edit"></i></button><button onclick="openDeleteModal('${item.id}')" class="action-btn text-red-500 hover:text-red-700" title="Hapus"><i data-lucide="trash-2"></i></button></td>` : '<td></td>';
         return `
          <tr class="border-b hover:bg-gray-50">
+            <td class="p-3">${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
             <td class="p-3 font-mono text-xs">${item.displayId}</td>
             <td class="p-3">${item.donorName}</td>
             <td class="p-3">${item.type.replace(/_/g, ' ')} (${item.quantity})</td>
             <td class="p-3">${item.tier}</td>
             <td class="p-3 text-right">Rp ${(item.totalValue || 0).toLocaleString('id-ID')}</td>
             <td class="p-3 text-right">Rp ${(item.discount || 0).toLocaleString('id-ID')}</td>
-            <td class="p-3">${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
             <td class="p-3">${item.source}</td>
             <td class="p-3">${item.location}</td>
             <td class="p-3">${item.allocatedBy}</td>
@@ -824,9 +822,9 @@ function renderStockPage(unallocated, allocated, cash) {
         const actions = userRole === 'admin' ? `<td class="p-3 text-center"><button onclick="openEditModal('${item.id}')" class="action-btn" title="Ubah"><i data-lucide="edit"></i></button><button onclick="openDeleteModal('${item.id}')" class="action-btn text-red-500 hover:text-red-700" title="Hapus"><i data-lucide="trash-2"></i></button></td>` : '<td></td>';
         return `
         <tr class="border-b hover:bg-gray-50">
+            <td class="p-3">${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
             <td class="p-3 font-mono text-xs">${item.displayId}</td>
             <td class="p-3">${item.donorName}</td>
-            <td class="p-3">${item.createdAt ? new Date(item.createdAt.seconds * 1000).toLocaleDateString('id-ID') : 'N/A'}</td>
             <td class="p-3">${item.source}</td>
             <td class="p-3 text-right">Rp ${item.totalValue.toLocaleString('id-ID')}</td>
             <td class="p-3">${item.notes || '-'}</td>

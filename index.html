@@ -324,6 +324,11 @@
                                     <label for="location" class="block text-sm font-medium text-gray-700">Lokasi (Kabupaten/Kota)</label>
                                     <input type="text" id="location" placeholder="cth. Bandung, Jawa Barat" class="mt-1 block w-full px-3 py-2 bg-white" required>
                                 </div>
+                                <!-- NEW: Allocation notes field -->
+                                <div>
+                                    <label for="allocation-notes" class="block text-sm font-medium text-gray-700">Catatan Alokasi</label>
+                                    <textarea id="allocation-notes" rows="3" class="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm"></textarea>
+                                </div>
                                 <button type="submit" class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700">
                                     Alokasikan
                                 </button>
@@ -340,6 +345,8 @@
                                         <th class="p-3">Jenis</th>
                                         <th class="p-3">Lokasi</th>
                                         <th class="p-3">Dialokasikan oleh</th>
+                                        <!-- NEW: Allocation notes header -->
+                                        <th class="p-3">Catatan</th>
                                     </tr>
                                 </thead>
                                 <tbody id="allocation-history-table"></tbody>

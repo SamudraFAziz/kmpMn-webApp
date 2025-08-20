@@ -854,8 +854,9 @@ function renderAllocationPage(unallocated, allocated) {
             <td class="p-3">${item.type.replace(/_/g, ' ')} (${item.tier})</td>
             <td class="p-3">${item.location}</td>
             <td class="p-3">${item.allocatedBy}</td>
+            <td class="p-3">${item.allocationNotes || '-'}</td>
         </tr>`).join('');
-    if (allocated.length === 0) historyTable.innerHTML = '<tr><td colspan="4" class="text-center p-4">Belum ada stok yang dialokasikan.</td></tr>';
+    if (allocated.length === 0) historyTable.innerHTML = '<tr><td colspan="5" class="text-center p-4">Belum ada stok yang dialokasikan.</td></tr>';
 }
 
 function renderRekapPage(rekapData) {
@@ -1103,12 +1104,14 @@ document.getElementById('allocation-form').addEventListener('submit', async (e) 
     if (userRole !== 'admin') return showToast("Anda tidak diizinkan.", "error");
     const docId = document.getElementById('real-doc-id').value;
     const location = document.getElementById('location').value;
+    const allocationNotes = document.getElementById('allocation-notes').value; // NEW: Get notes
     if (!docId || !location) return showToast("Silakan pilih stok dan masukkan lokasi.", "error");
     
     try {
         await updateDoc(doc(db, "donations", docId), {
             status: 'allocated',
             location: location,
+            allocationNotes: allocationNotes, // NEW: Save notes to Firestore
             allocatedBy: currentUser.email,
             allocatedAt: serverTimestamp()
         });
